@@ -173,4 +173,5 @@ de rede, TLS ou de configuração saem com código diferente de zero.
 
 ## Licença
 
-Ver LICENSE.
+Distribuído sob a licença [CC0 1.0 Universal](./LICENSE) — domínio
+público. Use, copie, modifique e redistribua sem restrições.
