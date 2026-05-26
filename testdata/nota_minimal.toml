@@ -1,0 +1,19 @@
+[tomador]
+cnpj = "44555666000170"
+razao_social = "TOMADOR EXEMPLO LTDA"
+email = "contato@tomador-exemplo.com.br"
+
+[tomador.endereco]
+endereco = "RUA DO TOMADOR"
+numero = "100"
+bairro = "CENTRO"
+codigo_municipio = "7654321"
+uf = "SP"
+cep = "01234000"
+
+[servico]
+discriminacao = "DESCRIÇÃO DO SERVIÇO PRESTADO"
+valor_servicos = 15000.0
+item_lista_servico = "0101"
+codigo_cnae = "6201500"
+aliquota = 2.0

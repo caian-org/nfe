@@ -1,0 +1,10 @@
+.git
+.github
+.claude
+.codex
+.nfews
+bin
+coverage.out
+ws
+*.test
+*.out

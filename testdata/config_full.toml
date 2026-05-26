@@ -1,0 +1,38 @@
+ambiente = "homologacao"
+
+[soap]
+wsdl_homologacao = "https://teste.exemplo.com.br/abrasf/ws/nfs?wsdl"
+wsdl_producao = "https://producao.exemplo.com.br/abrasf/ws/nfs?wsdl"
+
+[prestador]
+cnpj = "11222333000181"
+inscricao_municipal = "123456"
+razao_social = "EMPRESA DE TESTE LTDA"
+nome_fantasia = "TESTE"
+
+[prestador.endereco]
+endereco = "RUA EXEMPLO"
+numero = "100"
+complemento = "SALA 1"
+bairro = "CENTRO"
+codigo_municipio = "1234567"
+uf = "SP"
+cep = "01234000"
+
+[prestador.contato]
+telefone = "1100000000"
+email = "contato@exemplo.com.br"
+
+[autenticacao]
+usuario = "${NFE_USUARIO}"
+senha = "${NFE_SENHA}"
+
+[autenticacao.certificado]
+path = "/tmp/certs/empresa.pfx"
+senha = "senha-do-certificado"
+
+[configuracoes]
+serie_rps = "A"
+proximo_numero_rps = 1
+codigo_municipio = "1234567"
+aliquota_iss = 5.0
