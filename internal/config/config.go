@@ -40,12 +40,12 @@ type SOAP struct {
 }
 
 type Prestador struct {
-	CNPJ               string    `toml:"cnpj"`
-	InscricaoMunicipal string    `toml:"inscricao_municipal"`
-	RazaoSocial        string    `toml:"razao_social"`
-	NomeFantasia       string    `toml:"nome_fantasia,omitempty"`
-	Endereco           Endereco  `toml:"endereco"`
-	Contato            *Contato  `toml:"contato,omitempty"`
+	CNPJ               string   `toml:"cnpj"`
+	InscricaoMunicipal string   `toml:"inscricao_municipal"`
+	RazaoSocial        string   `toml:"razao_social"`
+	NomeFantasia       string   `toml:"nome_fantasia,omitempty"`
+	Endereco           Endereco `toml:"endereco"`
+	Contato            *Contato `toml:"contato,omitempty"`
 }
 
 type Endereco struct {

@@ -105,11 +105,11 @@ type Servico struct {
 // is a foreign individual without local documents — the schema makes it
 // optional, but Validate refuses notas without one or the other.
 type TomadorServico struct {
-	XMLName                xml.Name                `xml:"TomadorServico"`
-	IdentificacaoTomador   *IdentificacaoTomador   `xml:"IdentificacaoTomador,omitempty"`
-	RazaoSocial            string                  `xml:"RazaoSocial,omitempty"`
-	Endereco               *Endereco               `xml:"Endereco,omitempty"`
-	Contato                *Contato                `xml:"Contato,omitempty"`
+	XMLName              xml.Name              `xml:"TomadorServico"`
+	IdentificacaoTomador *IdentificacaoTomador `xml:"IdentificacaoTomador,omitempty"`
+	RazaoSocial          string                `xml:"RazaoSocial,omitempty"`
+	Endereco             *Endereco             `xml:"Endereco,omitempty"`
+	Contato              *Contato              `xml:"Contato,omitempty"`
 }
 
 // IdentificacaoTomador wraps the CPF/CNPJ in its own element so the schema's

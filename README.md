@@ -1,7 +1,24 @@
-# nfe
+[![CI][ci-shield]][ci-url]
+[![Release][rel-shield]][rel-url]
+[![GitHub tag][tag-shield]][tag-url]
 
-Cliente de linha de comando para emissão de **NFS-e** (Nota Fiscal de Serviço
-Eletrônica) seguindo o padrão **ABRASF v2.04**.
+# `nfe`
+
+> CLI para emissão de NFS-e (Nota Fiscal de Serviço Eletrônica) padrão
+> [ABRASF v2.04][abrasf]
+
+`nfe` é um cliente de linha de comando para emitir, consultar e cancelar
+NFS-e conforme o padrão ABRASF v2.04, usado por muitas prefeituras
+brasileiras.
+
+[ci-shield]: https://img.shields.io/github/actions/workflow/status/caian-org/nfe/ci.yml?label=ci&logo=github&style=flat-square
+[ci-url]: https://github.com/caian-org/nfe/actions/workflows/ci.yml
+[rel-shield]: https://img.shields.io/github/actions/workflow/status/caian-org/nfe/release.yml?label=release&logo=github&style=flat-square
+[rel-url]: https://github.com/caian-org/nfe/actions/workflows/release.yml
+[tag-shield]: https://img.shields.io/github/tag/caian-org/nfe.svg?logo=git&logoColor=FFF&style=flat-square
+[tag-url]: https://github.com/caian-org/nfe/releases
+
+[abrasf]: https://abrasf.org.br
 
 ## Status
 
@@ -17,6 +34,12 @@ just build              # gera ./bin/nfe
 ```
 
 Requer Go 1.21+ (desenvolvido contra 1.26).
+
+### Via Docker
+
+```sh
+docker run --rm ghcr.io/caian-org/nfe:latest --help
+```
 
 ## Início rápido
 
@@ -173,5 +196,14 @@ de rede, TLS ou de configuração saem com código diferente de zero.
 
 ## Licença
 
-Distribuído sob a licença [CC0 1.0 Universal](./LICENSE) — domínio
-público. Use, copie, modifique e redistribua sem restrições.
+Na medida do permitido por lei, [Caian Ertl][me] renunciou a __todos os
+direitos autorais e direitos conexos a este trabalho__. No espírito de
+_liberdade de informação_, você é encorajado a clonar, modificar, distribuir,
+compartilhar ou fazer o que quiser com este projeto! [`^C ^V`][kopimi]
+
+[![Licença][cc-shield]][cc-url]
+
+[me]: https://github.com/upsetbit
+[cc-shield]: https://forthebadge.com/images/badges/cc-0.svg
+[cc-url]: http://creativecommons.org/publicdomain/zero/1.0
+[kopimi]: https://kopimi.com

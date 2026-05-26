@@ -144,4 +144,3 @@ func buildTomador(in *nota.Input) *TomadorServico {
 		Contato:              contato,
 	}
 }
-

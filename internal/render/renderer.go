@@ -89,10 +89,10 @@ type QueryInfo struct {
 
 // QueriedNFSe is the parsed view of a single NFS-e returned by query.
 type QueriedNFSe struct {
-	Numero            string `json:"numero,omitempty"`
-	CodigoVerificacao string `json:"codigo_verificacao,omitempty"`
-	DataEmissao       string `json:"data_emissao,omitempty"`
-	ValorServicos     string `json:"valor_servicos,omitempty"`
+	Numero             string `json:"numero,omitempty"`
+	CodigoVerificacao  string `json:"codigo_verificacao,omitempty"`
+	DataEmissao        string `json:"data_emissao,omitempty"`
+	ValorServicos      string `json:"valor_servicos,omitempty"`
 	RazaoSocialTomador string `json:"razao_social_tomador,omitempty"`
 }
 

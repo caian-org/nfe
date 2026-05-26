@@ -80,11 +80,13 @@ func TestNoEmojisInAnyHumanOutput(t *testing.T) {
 	cfgPath := filepath.Join(dir, "config.toml")
 
 	outputs := map[string]func() (string, error){
-		"init":       func() (string, error) { return runCmd(t, "init", t.TempDir()) },
-		"env":        func() (string, error) { return runCmd(t, "-c", cfgPath, "env", "producao") },
-		"status":     func() (string, error) { return runCmd(t, "-c", cfgPath, "status") },
-		"emit-dry":   func() (string, error) { return runCmd(t, "-c", cfgPath, "emit", filepath.Join(dir, "example-nota.toml"), "--dry-run") },
-		"query-bad":  func() (string, error) { o, _ := runCmd(t, "-c", cfgPath, "query"); return o, nil },
+		"init":   func() (string, error) { return runCmd(t, "init", t.TempDir()) },
+		"env":    func() (string, error) { return runCmd(t, "-c", cfgPath, "env", "producao") },
+		"status": func() (string, error) { return runCmd(t, "-c", cfgPath, "status") },
+		"emit-dry": func() (string, error) {
+			return runCmd(t, "-c", cfgPath, "emit", filepath.Join(dir, "example-nota.toml"), "--dry-run")
+		},
+		"query-bad": func() (string, error) { o, _ := runCmd(t, "-c", cfgPath, "query"); return o, nil },
 	}
 
 	emojis := []string{"✅", "❌", "🔄", "📤", "⏳", "📄", "📝", "🔑", "🎉"}
