@@ -1,6 +1,6 @@
 ---
 name: nf-dev-workflow
-description: Local development workflow for the nf repository. Use when orienting in the codebase, choosing the right make target, picking a validation lane, or making cross-package changes that are not tied to a single domain skill.
+description: Local development workflow for the nf repository. Use when orienting in the codebase, choosing the right just recipe, picking a validation lane, or making cross-package changes that are not tied to a single domain skill.
 ---
 
 # Nf Dev Workflow
@@ -32,17 +32,17 @@ Test fixtures: `testdata/config_full.toml`, `testdata/config_no_cert.toml`,
 
 ## Command surface
 
-Standard Go toolchain via `Makefile`:
+Standard Go toolchain via `.justfile`:
 
 ```bash
-make build         # produces bin/nfe
-make test          # go test ./...
-make test-race     # go test ./... -race
-make cover         # coverage profile + per-function totals
-make lint          # go vet ./... (CI also runs golangci-lint)
-make tidy          # go mod tidy
-make clean         # remove bin/ and coverage.out
-make run ARGS=...  # build, then run bin/nfe with ARGS
+just build         # produces bin/nfe
+just test          # go test ./...
+just test-race     # go test ./... -race
+just cover         # coverage profile + per-function totals
+just lint          # go vet ./... (CI also runs golangci-lint)
+just tidy          # go mod tidy
+just clean         # remove bin/ and coverage.out
+just run ...        # build, then run bin/nfe with the given args
 ```
 
 CLI surface (see `internal/cli/`):
@@ -62,12 +62,12 @@ Every subcommand respects the global `-c/--config` flag (default
 
 Smallest useful check first.
 
-- After a small code change: `make test`.
-- Before opening a PR: `make test-race` plus `make lint` (CI runs the
+- After a small code change: `just test`.
+- Before opening a PR: `just test-race` plus `just lint` (CI runs the
   same plus golangci-lint).
 - After touching XML builders: `go test ./internal/abrasf/... -update`
   to regenerate goldens, then read the diff carefully, then
-  `make test-race` again.
+  `just test-race` again.
 - After touching SOAP/WSDL discovery: `go test ./internal/soap/...`.
 - After touching the signer: `go test ./internal/xmlsig/...`.
 

@@ -33,13 +33,13 @@ Go module (`github.com/caian-org/nfe`); the binary entrypoint is
 
 Standard Go toolchain. Common targets:
 
-- `make build` — builds `bin/nfe`.
-- `make test` — runs `go test ./...`.
-- `make test-race` — runs the suite with `-race`.
-- `make cover` — coverage profile plus per-function totals.
-- `make lint` — currently `go vet ./...`. CI additionally runs
+- `just build` — builds `bin/nfe`.
+- `just test` — runs `go test ./...`.
+- `just test-race` — runs the suite with `-race`.
+- `just cover` — coverage profile plus per-function totals.
+- `just lint` — currently `go vet ./...`. CI additionally runs
   `golangci-lint` per `.golangci.yml`.
-- `make tidy` — `go mod tidy`.
+- `just tidy` — `go mod tidy`.
 - `go test ./internal/abrasf/... -update` — regenerate the XML golden
   fixtures under `testdata/golden/`.
 
@@ -63,7 +63,7 @@ Standard Go toolchain. Common targets:
 
 `testify` is used for assertions. XML builders are validated by byte-for-
 byte golden file comparison in `internal/abrasf/abrasf_test.go` against
-`testdata/golden/*.xml`. Run `make test-race` before opening a PR; the
+`testdata/golden/*.xml`. Run `just test-race` before opening a PR; the
 race detector catches the goroutine-driven HTTP fixtures in
 `internal/soap/client_test.go` and the lazy-init paths in
 `internal/service/service.go`.

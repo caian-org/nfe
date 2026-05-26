@@ -32,7 +32,7 @@ appropriate for non-trivial schema or wire-format changes.
 - pt-BR voice / translation review → `nf-pt-br-translator`.
 - Test runs and coverage reports → `nf-test-runner`.
 - README, `.github/workflows/`, `.goreleaser.yaml`, `.golangci.yml`,
-  `Makefile` — outside the architecture lane.
+  `.justfile` — outside the architecture lane.
 
 ## Do first
 
@@ -67,4 +67,4 @@ appropriate for non-trivial schema or wire-format changes.
 - Concise architectural recommendation or patch summary.
 - Wire-format / signature / transport risks called out explicitly.
 - Exact validation commands to run after the change (typically
-  `go test ./internal/abrasf/... -update` + `make test-race`).
+  `go test ./internal/abrasf/... -update` + `just test-race`).

@@ -10,18 +10,18 @@ model: haiku
 # Nf Test Runner
 
 Use this agent to execute the test suite and summarise the outcome. It
-does not modify code; it runs make targets and reports.
+does not modify code; it runs just recipes and reports.
 
 ## Default invocation
 
 ```bash
-make test-race
+just test-race
 ```
 
 When coverage is requested, also run:
 
 ```bash
-make cover
+just cover
 ```
 
 For focused suites (e.g. after a single-package change):
@@ -40,17 +40,17 @@ If the request explicitly asks to regenerate, run:
 go test ./internal/abrasf/... -update
 ```
 
-Then run `make test-race` again to confirm the regenerated goldens
+Then run `just test-race` again to confirm the regenerated goldens
 match builders. Hand back the list of changed files under
 `testdata/golden/` for the user to review before committing.
 
 ## Reporting format
 
-- ✓ / ✗ per make target run.
+- ✓ / ✗ per just recipe run.
 - For failures: file:line + the first useful line of the assertion
   diff. Do not paste full diff blocks.
 - Total time and pass/fail count from `go test`.
-- Coverage totals (function and overall %) when `make cover` was run.
+- Coverage totals (function and overall %) when `just cover` was run.
 
 ## Out of scope
 

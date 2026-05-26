@@ -71,7 +71,7 @@ Use this after any intentional change to the builders. Then:
    change should be explainable.
 2. Commit the builder change and the regenerated golden together. Never
    in separate commits.
-3. Re-run `make test-race` to make sure the rest of the suite still
+3. Re-run `just test-race` to make sure the rest of the suite still
    passes.
 
 ## Common pitfalls

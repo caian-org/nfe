@@ -13,7 +13,7 @@ Out of scope:
 - CLI cosmetics, Cobra help text, render labels (owned by nf-pt-br-translator).
 - pt-BR voice / translation review (owned by nf-pt-br-translator).
 - Test runs and coverage reports (owned by nf-test-runner).
-- README, .github/workflows/, .goreleaser.yaml, .golangci.yml, Makefile — outside the architecture lane.
+- README, .github/workflows/, .goreleaser.yaml, .golangci.yml, the .justfile — outside the architecture lane.
 
 Do first:
 - Read .codex/skills/nf-dev-workflow/SKILL.md for command surface and project layout.
@@ -32,6 +32,6 @@ Rules:
 Expected output:
 - Concise architectural recommendation or patch summary.
 - Wire-format / signature / transport risks called out explicitly.
-- Exact validation commands to run after the change (typically go test ./internal/abrasf/... -update + make test-race).
+- Exact validation commands to run after the change (typically go test ./internal/abrasf/... -update + just test-race).
 """
 model_reasoning_effort = "high"

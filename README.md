@@ -12,7 +12,7 @@ escopo.
 ## Build
 
 ```sh
-make build              # gera ./bin/nfe
+just build              # gera ./bin/nfe
 ./bin/nfe --version
 ```
 
@@ -132,9 +132,9 @@ reordenar campos produz XML que o WS rejeita.
 ## Testes
 
 ```sh
-make test               # suite completa
-make test-race          # com -race
-make cover              # relatório de cobertura
+just test               # suite completa
+just test-race          # com -race
+just cover              # relatório de cobertura
 ```
 
 Goldens ficam em `testdata/golden/`. Para regenerar após uma mudança

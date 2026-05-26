@@ -35,8 +35,8 @@ covers only what is specific to Claude Code or to quick orientation.
 
 Command surface:
 
-- `make build` / `make test` / `make test-race` / `make cover` / `make lint`
-  / `make tidy`.
+- `just build` / `just test` / `just test-race` / `just cover` / `just lint`
+  / `just tidy`.
 - `./bin/nfe init [path]` — scaffold a project (defaults to `~/.nfews`).
 - `./bin/nfe -c <path>/config.toml status` — show config summary.
 - `./bin/nfe -c <path>/config.toml env homologacao|producao` — switch the
@@ -62,6 +62,6 @@ Subagents (`.claude/agents/<name>.md` and `.codex/agents/<name>.toml`):
 - `nf-architect` — cross-package design questions across
   `internal/{abrasf,xmlsig,soap,service}`.
 - `nf-abrasf-xml-reviewer` — XML structure and signature placement audit.
-- `nf-test-runner` — runs `make test-race` / `make cover` and reports.
+- `nf-test-runner` — runs `just test-race` / `just cover` and reports.
 - `nf-pt-br-translator` — pt-BR voice and consistency audit across
   user-facing strings.
