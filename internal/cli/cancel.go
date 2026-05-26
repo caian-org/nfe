@@ -63,7 +63,7 @@ func newCancelCmd(gf *globalFlags) *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&numero, "numero", "n", "", "número da NFS-e a cancelar (obrigatório)")
 	cmd.Flags().IntVar(&codigo, "codigo", 0, "código de cancelamento: 1=erro emissão, 2=serviço não prestado, 3=erro processamento, 4=duplicidade")
-	cmd.MarkFlagRequired("numero")    //nolint:errcheck — only fails if the flag doesn't exist
-	cmd.MarkFlagRequired("codigo")    //nolint:errcheck
+	_ = cmd.MarkFlagRequired("numero")
+	_ = cmd.MarkFlagRequired("codigo")
 	return cmd
 }

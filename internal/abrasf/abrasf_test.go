@@ -295,7 +295,7 @@ func TestCancelarValidatesRequiredFields(t *testing.T) {
 
 func TestDec2MarshalsTwoDecimals(t *testing.T) {
 	type box struct {
-		XMLName xml.Name   `xml:"V"`
+		XMLName xml.Name    `xml:"V"`
 		Val     abrasf.Dec2 `xml:"x"`
 	}
 	out, err := xml.Marshal(box{Val: 1.5})
@@ -322,7 +322,7 @@ func TestBuildRPSDefaultsToNowWhenTodayIsZero(t *testing.T) {
 
 func TestDec1MarshalsOneDecimal(t *testing.T) {
 	type box struct {
-		XMLName xml.Name   `xml:"V"`
+		XMLName xml.Name    `xml:"V"`
 		Val     abrasf.Dec1 `xml:"x"`
 	}
 	out, err := xml.Marshal(box{Val: 2})

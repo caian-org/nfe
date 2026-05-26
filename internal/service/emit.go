@@ -11,12 +11,12 @@ import (
 // EmitResult is what Emit returns on success. On failure (validation, network,
 // or business rules) Emit returns an error and *EmitResult is nil.
 type EmitResult struct {
-	NumeroRPS    int    // Sequence number used for this RPS (already bumped on success).
-	NumeroNFSe   string // Authorized NFS-e number returned by the WS, when present.
-	UnsignedXML  []byte // The XML pre-signing — useful for debugging.
-	SignedXML    []byte // The XML actually posted (or that would be posted on dry-run).
-	RawResponse  []byte // The SOAP response body returned by the WS. Empty on dry-run.
-	Mensagens    []abrasf.MensagemRetorno
+	NumeroRPS   int    // Sequence number used for this RPS (already bumped on success).
+	NumeroNFSe  string // Authorized NFS-e number returned by the WS, when present.
+	UnsignedXML []byte // The XML pre-signing — useful for debugging.
+	SignedXML   []byte // The XML actually posted (or that would be posted on dry-run).
+	RawResponse []byte // The SOAP response body returned by the WS. Empty on dry-run.
+	Mensagens   []abrasf.MensagemRetorno
 }
 
 // Emit posts a new NFS-e to the WS. On success it bumps cfg.Configuracoes.
