@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/beevik/etree v1.6.0
 	github.com/fatih/color v1.19.0
-	github.com/jedib0t/go-pretty/v6 v6.7.10
+	github.com/jedib0t/go-pretty/v6 v6.8.0
 	github.com/pelletier/go-toml/v2 v2.3.1
 	github.com/russellhaering/goxmldsig v1.6.0
 	github.com/spf13/cobra v1.10.2
