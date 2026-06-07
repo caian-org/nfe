@@ -34,8 +34,10 @@ func TestInitCreatesProject(t *testing.T) {
 	assert.Contains(t, out, "projeto inicializado em")
 
 	cfgPath := filepath.Join(dir, "config.toml")
-	notaPath := filepath.Join(dir, "example-nota.toml")
+	notasPath := filepath.Join(dir, "notas")
+	notaPath := filepath.Join(notasPath, "example.toml")
 	readmePath := filepath.Join(dir, "README.md")
+	assert.DirExists(t, notasPath)
 	for _, p := range []string{cfgPath, notaPath, readmePath} {
 		assert.FileExists(t, p)
 	}
@@ -60,7 +62,7 @@ func TestInitDefaultPathUsesNfewsUnderHome(t *testing.T) {
 	assert.FileExists(t, filepath.Join(expected, "config.toml"))
 }
 
-// After `nfe init` without args, subsequent `nfe status` (no -c) must pick up
+// After `nfe init` without args, subsequent `nfe status` must pick up
 // the config that init just wrote into ~/.nfews — otherwise the default flow
 // is broken from the user's perspective.
 func TestStatusDefaultConfigResolvesNfewsUnderHome(t *testing.T) {
@@ -94,7 +96,7 @@ func TestEnvSwitch(t *testing.T) {
 	require.NoError(t, err)
 
 	cfgPath := filepath.Join(dir, "config.toml")
-	out, err := runCmd(t, "-c", cfgPath, "env", "producao")
+	out, err := runCmd(t, "-w", dir, "env", "producao")
 	require.NoError(t, err)
 	assert.Contains(t, out, "ambiente alterado para producao")
 
@@ -108,8 +110,7 @@ func TestEnvRejectsInvalid(t *testing.T) {
 	_, err := runCmd(t, "init", dir)
 	require.NoError(t, err)
 
-	cfgPath := filepath.Join(dir, "config.toml")
-	_, err = runCmd(t, "-c", cfgPath, "env", "qa")
+	_, err = runCmd(t, "-w", dir, "env", "qa")
 	require.Error(t, err)
 }
 
@@ -118,8 +119,7 @@ func TestStatusHuman(t *testing.T) {
 	_, err := runCmd(t, "init", dir)
 	require.NoError(t, err)
 
-	cfgPath := filepath.Join(dir, "config.toml")
-	out, err := runCmd(t, "-c", cfgPath, "status")
+	out, err := runCmd(t, "-w", dir, "status")
 	require.NoError(t, err)
 	assert.Contains(t, out, "ambiente")
 	assert.Contains(t, out, "homologacao")
@@ -135,8 +135,7 @@ func TestStatusJSON(t *testing.T) {
 	_, err := runCmd(t, "init", dir)
 	require.NoError(t, err)
 
-	cfgPath := filepath.Join(dir, "config.toml")
-	out, err := runCmd(t, "--json", "-c", cfgPath, "status")
+	out, err := runCmd(t, "--json", "-w", dir, "status")
 	require.NoError(t, err)
 
 	var got map[string]any
@@ -150,8 +149,30 @@ func TestStatusJSON(t *testing.T) {
 	assert.False(t, status["using_certificate"].(bool))
 }
 
-func TestStatusMissingConfigErrors(t *testing.T) {
-	_, err := runCmd(t, "-c", "/no/such/dir/config.toml", "status")
+func TestStatusMissingWorkspaceConfigErrors(t *testing.T) {
+	_, err := runCmd(t, "-w", "/no/such/dir", "status")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "não encontrado")
+}
+
+func TestConfigFlagIsRemoved(t *testing.T) {
+	_, err := runCmd(t, "--config", "/tmp/config.toml", "status")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown flag")
+
+	_, err = runCmd(t, "-c", "/tmp/config.toml", "status")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown shorthand flag")
+}
+
+func TestEmitRejectsNotaPathsAndExtensions(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "proj")
+	_, err := runCmd(t, "init", dir)
+	require.NoError(t, err)
+
+	for _, arg := range []string{"example.toml", "notas/example", "../example"} {
+		_, err := runCmd(t, "-w", dir, "emit", arg, "--dry-run")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "identificador da nota inválido")
+	}
 }

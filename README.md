@@ -46,11 +46,11 @@ docker run --rm ghcr.io/caian-org/nfe:latest --help
 ```sh
 ./bin/nfe init                                  # cria ~/.nfews
 # Edite ~/.nfews/config.toml com os dados do seu prestador, credenciais e os
-# endpoints WSDL do seu município. Os comandos abaixo usam ~/.nfews/config.toml
-# por padrão; use -c para apontar para outro caminho.
+# endpoints WSDL do seu município. As notas ficam em ~/.nfews/notas/.
+# Os comandos abaixo usam ~/.nfews por padrão; use --workspace para outro caminho.
 ./bin/nfe status
-./bin/nfe emit ~/.nfews/example-nota.toml --dry-run    # valida sem chamar o WS
-./bin/nfe emit ~/.nfews/example-nota.toml              # emite de verdade
+./bin/nfe emit example --dry-run                # valida ~/.nfews/notas/example.toml sem chamar o WS
+./bin/nfe emit example                          # emite de verdade
 ./bin/nfe query --numero 42
 ./bin/nfe cancel --numero 42 --codigo 1
 ```
@@ -59,8 +59,8 @@ docker run --rm ghcr.io/caian-org/nfe:latest --help
 
 | Comando | Função |
 |---|---|
-| `init [caminho]` | Cria a estrutura do projeto: `config.toml`, `example-nota.toml`, `README.md`. Padrão `~/.nfews`. |
-| `emit <arquivo>` | Emite uma NFS-e a partir de um TOML. `--dry-run` gera e assina sem chamar o WS. `--wait-timeout` ajusta o timeout (padrão 60s). |
+| `init [caminho]` | Cria a estrutura do projeto: `config.toml`, `notas/example.toml`, `README.md`. Padrão `~/.nfews`. |
+| `emit <nota>` | Emite uma NFS-e a partir de `notas/<nota>.toml` no workspace. `--dry-run` gera e assina sem chamar o WS. `--wait-timeout` ajusta o timeout (padrão 60s). |
 | `query` | Consulta NFS-e por `--numero` ou por `--data-inicial`/`--data-final`. |
 | `cancel` | Cancela uma NFS-e autorizada: exige `--numero` e `--codigo` (1=erro emissão, 2=serviço não prestado, 3=erro processamento, 4=duplicidade). |
 | `env <homologacao\|producao>` | Alterna o ambiente ativo. |
@@ -70,7 +70,7 @@ docker run --rm ghcr.io/caian-org/nfe:latest --help
 
 | Flag | Significado |
 |---|---|
-| `-c, --config` | Caminho do arquivo de configuração (padrão `~/.nfews/config.toml`). |
+| `-w, --workspace` | Diretório de trabalho com `config.toml` e `notas/` (padrão `~/.nfews`). |
 | `--json` | Emite saída JSON ao invés de texto humano. |
 
 ## Configuração (TOML)
@@ -183,11 +183,11 @@ formato wire.
 3. Aponte `[soap]` para o WSDL de homologação do seu município.
 4. Execute:
    ```sh
-   ./bin/nfe -c config.toml status                 # confere a config
-   ./bin/nfe -c config.toml emit nota.toml --dry-run
-   ./bin/nfe -c config.toml emit nota.toml
-   ./bin/nfe -c config.toml query --numero <retornado>
-   ./bin/nfe -c config.toml cancel --numero <retornado> --codigo 1
+   ./bin/nfe --workspace . status                 # confere ./config.toml
+   ./bin/nfe --workspace . emit nota --dry-run     # usa ./notas/nota.toml
+   ./bin/nfe --workspace . emit nota
+   ./bin/nfe --workspace . query --numero <retornado>
+   ./bin/nfe --workspace . cancel --numero <retornado> --codigo 1
    ```
 
 Se o WS rejeitar com um erro de regra de negócio, a CLI imprime as entradas

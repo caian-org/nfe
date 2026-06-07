@@ -21,12 +21,16 @@ func newEnvCmd(gf *globalFlags) *cobra.Command {
 					env, config.EnvHomologacao, config.EnvProducao)
 			}
 
-			cfg, err := config.Load(gf.configPath)
+			configPath, err := gf.configPath()
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
 			}
 			cfg.Ambiente = env
-			if err := config.Save(gf.configPath, cfg); err != nil {
+			if err := config.Save(configPath, cfg); err != nil {
 				return err
 			}
 			return gf.renderer(cmd).Env(env)

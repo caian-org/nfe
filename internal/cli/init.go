@@ -18,7 +18,7 @@ func newInitCmd(gf *globalFlags) *cobra.Command {
 		Short: "Cria a estrutura inicial de um projeto NFS-e",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			path := defaultProjectPath()
+			path := gf.workspacePath
 			if len(args) == 1 {
 				path = args[0]
 			}
@@ -27,31 +27,23 @@ func newInitCmd(gf *globalFlags) *cobra.Command {
 	}
 }
 
-// defaultProjectPath returns "$HOME/.nfews", falling back to "./.nfews" when
-// the user home directory cannot be resolved (rare, but possible on minimal
-// containers).
-func defaultProjectPath() string {
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		return filepath.Join(home, ".nfews")
-	}
-	return "./.nfews"
-}
-
-// defaultConfigPath returns the config.toml inside the default project
-// directory. It is used as the fallback for the global -c/--config flag so
-// `nfe init` followed by `nfe query` works without any extra arguments.
-func defaultConfigPath() string {
-	return filepath.Join(defaultProjectPath(), "config.toml")
-}
-
 func runInit(cmd *cobra.Command, gf *globalFlags, projectPath string) error {
+	projectPath, err := filepath.Abs(projectPath)
+	if err != nil {
+		return fmt.Errorf("resolver workspace: %w", err)
+	}
 	if err := os.MkdirAll(projectPath, 0o755); err != nil {
 		return fmt.Errorf("falha ao criar diretório do projeto: %w", err)
 	}
 
 	configPath := filepath.Join(projectPath, "config.toml")
-	notaPath := filepath.Join(projectPath, "example-nota.toml")
+	notasPath := filepath.Join(projectPath, "notas")
+	notaPath := filepath.Join(notasPath, "example.toml")
 	readmePath := filepath.Join(projectPath, "README.md")
+
+	if err := os.MkdirAll(notasPath, 0o755); err != nil {
+		return fmt.Errorf("falha ao criar diretório de notas: %w", err)
+	}
 
 	if err := config.Save(configPath, config.Default()); err != nil {
 		return err
@@ -80,13 +72,13 @@ NFS-e via webservice ABRASF v2.04.
 ## Arquivos
 
 - ` + "`config.toml`" + ` — configuração principal (prestador, endpoints, credenciais)
-- ` + "`example-nota.toml`" + ` — exemplo de entrada de nota
+- ` + "`notas/example.toml`" + ` — exemplo de entrada de nota
 - ` + "`README.md`" + ` — este arquivo
 
 ## Uso
 
 ` + "```" + `
-nfe emit example-nota.toml          # emite a nota
+nfe emit example                    # emite notas/example.toml
 nfe query --numero 123              # consulta por número
 nfe query --data-inicial 2025-01-01 --data-final 2025-01-31
 nfe cancel --numero 123 --codigo 1  # cancela a nota

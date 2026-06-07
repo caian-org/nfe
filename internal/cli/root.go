@@ -15,8 +15,8 @@ var (
 )
 
 type globalFlags struct {
-	configPath string
-	json       bool
+	workspacePath string
+	json          bool
 }
 
 func (g *globalFlags) renderer(cmd *cobra.Command) render.Renderer {
@@ -36,7 +36,7 @@ func NewRoot() *cobra.Command {
 		SilenceErrors: false,
 	}
 
-	root.PersistentFlags().StringVarP(&gf.configPath, "config", "c", defaultConfigPath(), "caminho do arquivo de configuração")
+	root.PersistentFlags().StringVarP(&gf.workspacePath, "workspace", "w", defaultWorkspacePath(), "diretório de trabalho com config.toml e notas/")
 	root.PersistentFlags().BoolVar(&gf.json, "json", false, "emite saída JSON ao invés de texto humano")
 
 	root.AddCommand(
