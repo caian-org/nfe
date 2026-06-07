@@ -115,6 +115,12 @@ func parseQueriedNFSes(body []byte) []render.QueriedNFSe {
 		Numero            string      `xml:"Numero"`
 		CodigoVerificacao string      `xml:"CodigoVerificacao"`
 		DataEmissao       string      `xml:"DataEmissao"`
+		Url               string      `xml:"Url"`
+		URL               string      `xml:"URL"`
+		UrlNfse           string      `xml:"UrlNfse"`
+		UrlVisualizacao   string      `xml:"UrlVisualizacao"`
+		UrlDownload       string      `xml:"UrlDownload"`
+		Link              string      `xml:"Link"`
 		ValoresNfse       valoresNfse `xml:"ValoresNfse"`
 		Declaracao        declaracao  `xml:"DeclaracaoPrestacaoServico"`
 	}
@@ -145,15 +151,29 @@ func parseQueriedNFSes(body []byte) []render.QueriedNFSe {
 		if valor == "" {
 			valor = strings.TrimSpace(inf.ValoresNfse.BaseCalculo)
 		}
-		out = append(out, render.QueriedNFSe{
+		nfse := render.QueriedNFSe{
 			Numero:             strings.TrimSpace(inf.Numero),
 			CodigoVerificacao:  strings.TrimSpace(inf.CodigoVerificacao),
 			DataEmissao:        formatEmissao(strings.TrimSpace(inf.DataEmissao)),
 			ValorServicos:      valor,
 			RazaoSocialTomador: strings.TrimSpace(inf.Declaracao.InfDec.TomadorServico.RazaoSocial),
-		})
+			URL:                firstNonEmpty(inf.Url, inf.URL, inf.UrlNfse, inf.UrlVisualizacao, inf.UrlDownload, inf.Link),
+		}
+		if nfse.Numero == "" && nfse.CodigoVerificacao == "" && nfse.DataEmissao == "" && nfse.ValorServicos == "" && nfse.RazaoSocialTomador == "" && nfse.URL == "" {
+			continue
+		}
+		out = append(out, nfse)
 	}
 	return out
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, v := range values {
+		if s := strings.TrimSpace(v); s != "" {
+			return s
+		}
+	}
+	return ""
 }
 
 // formatEmissao shortens an ISO 8601 timestamp ("2025-12-15T15:45:40-03:00")

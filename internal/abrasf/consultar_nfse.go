@@ -51,3 +51,29 @@ func BuildConsultarServicoPrestado(cnpj, inscricao string, q ConsultaQuery) ([]b
 	}
 	return out, nil
 }
+
+// BuildConsultarPorRPS serializes a ConsultarNfseRpsEnvio request for the RPS
+// identifier used by GerarNfse.
+func BuildConsultarPorRPS(cnpj, inscricao string, rps IdentificacaoRps) ([]byte, error) {
+	if cnpj == "" || inscricao == "" {
+		return nil, fmt.Errorf("BuildConsultarPorRPS: CNPJ e inscrição municipal do prestador são obrigatórios")
+	}
+	if rps.Numero == 0 || rps.Serie == "" || rps.Tipo == 0 {
+		return nil, fmt.Errorf("BuildConsultarPorRPS: identificação do RPS incompleta")
+	}
+
+	env := ConsultarNfsePorRpsEnvio{
+		Xmlns:            Namespace,
+		IdentificacaoRps: rps,
+		Prestador: Prestador{
+			CpfCnpj:            CpfCnpj{CNPJ: cnpj},
+			InscricaoMunicipal: inscricao,
+		},
+	}
+
+	out, err := xml.Marshal(env)
+	if err != nil {
+		return nil, fmt.Errorf("serializar ConsultarNfseRpsEnvio: %w", err)
+	}
+	return out, nil
+}

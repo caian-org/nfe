@@ -238,6 +238,22 @@ func TestConsultarPorPeriodoGolden(t *testing.T) {
 	assert.False(t, bytes.Contains(out, []byte("NumeroNfse")))
 }
 
+func TestConsultarPorRPSGolden(t *testing.T) {
+	out, err := abrasf.BuildConsultarPorRPS(
+		"11222333000181",
+		"123456",
+		abrasf.IdentificacaoRps{
+			Numero: 7,
+			Serie:  "00000",
+			Tipo:   abrasf.TipoRPS,
+		},
+	)
+	require.NoError(t, err)
+	assertGolden(t, "consultar_por_rps.xml", out)
+	assert.True(t, bytes.Contains(out, []byte("<IdentificacaoRps>")))
+	assert.True(t, bytes.Contains(out, []byte("<Numero>7</Numero>")))
+}
+
 func TestConsultarRequiresFilter(t *testing.T) {
 	_, err := abrasf.BuildConsultarServicoPrestado("11222333000181", "123456", abrasf.ConsultaQuery{})
 	require.Error(t, err)

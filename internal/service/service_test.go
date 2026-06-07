@@ -206,6 +206,22 @@ func TestQueryByNumero(t *testing.T) {
 	assert.Contains(t, string(fake.lastBody), "<NumeroNfse>42</NumeroNfse>")
 }
 
+func TestQueryByRPS(t *testing.T) {
+	svc, fake := fixtureService(t, false)
+	fake.response = wrapSOAPResponse(`<ConsultarNfsePorRpsResposta><CompNfse><Nfse><InfNfse><Numero>1</Numero></InfNfse></Nfse></CompNfse></ConsultarNfsePorRpsResposta>`)
+
+	res, err := svc.QueryByRPS(context.Background(), abrasf.IdentificacaoRps{
+		Numero: 7,
+		Serie:  "00000",
+		Tipo:   abrasf.TipoRPS,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, "ConsultarNfsePorRps", fake.lastAction)
+	assert.Contains(t, string(fake.lastBody), "<ConsultarNfseRpsEnvio")
+	assert.Contains(t, string(fake.lastBody), "<Numero>7</Numero>")
+}
+
 func TestQuerySurfacesErrors(t *testing.T) {
 	svc, fake := fixtureService(t, false)
 	fake.response = wrapSOAPResponse(`<r><MensagemRetorno><Codigo>E1</Codigo><Mensagem>m</Mensagem></MensagemRetorno></r>`)

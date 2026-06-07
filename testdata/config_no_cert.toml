@@ -26,3 +26,5 @@ serie_rps = "A"
 proximo_numero_rps = 42
 codigo_municipio = "1234567"
 aliquota_iss = 5.0
+confirm_timeout = "2m"
+confirm_interval = "5s"

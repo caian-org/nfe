@@ -71,12 +71,16 @@ type MensagemRetorno struct {
 // EmitInfo is the user-facing view of an emission attempt.
 type EmitInfo struct {
 	DryRun     bool              `json:"dry_run"`
+	Verbose    bool              `json:"verbose,omitempty"`
 	Sucesso    bool              `json:"sucesso"`
 	NumeroRPS  int               `json:"numero_rps"`
 	NumeroNFSe string            `json:"numero_nfse,omitempty"`
+	NFSe       *QueriedNFSe      `json:"nfse,omitempty"`
+	Pendente   bool              `json:"pendente,omitempty"`
 	Mensagens  []MensagemRetorno `json:"mensagens,omitempty"`
 	SignedXML  string            `json:"signed_xml,omitempty"`
 	Response   string            `json:"response,omitempty"`
+	ConfirmXML string            `json:"confirm_response,omitempty"`
 }
 
 // QueryInfo is the user-facing view of a query.
@@ -94,6 +98,7 @@ type QueriedNFSe struct {
 	DataEmissao        string `json:"data_emissao,omitempty"`
 	ValorServicos      string `json:"valor_servicos,omitempty"`
 	RazaoSocialTomador string `json:"razao_social_tomador,omitempty"`
+	URL                string `json:"url,omitempty"`
 }
 
 // CancelInfo is the user-facing view of a cancellation attempt.
@@ -112,5 +117,5 @@ func New(jsonOutput bool, stdout io.Writer) Renderer {
 	if jsonOutput {
 		return &jsonRenderer{w: stdout}
 	}
-	return &humanRenderer{w: stdout}
+	return &humanRenderer{w: stdout, styles: newHumanStyles(colorEnabled(stdout))}
 }

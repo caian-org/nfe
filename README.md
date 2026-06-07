@@ -60,7 +60,7 @@ docker run --rm ghcr.io/caian-org/nfe:latest --help
 | Comando | Função |
 |---|---|
 | `init [caminho]` | Cria a estrutura do projeto: `config.toml`, `notas/example.toml`, `README.md`. Padrão `~/.nfews`. |
-| `emit <nota>` | Emite uma NFS-e a partir de `notas/<nota>.toml` no workspace. `--dry-run` gera e assina sem chamar o WS. `--wait-timeout` ajusta o timeout (padrão 60s). |
+| `emit <nota>` | Emite uma NFS-e a partir de `notas/<nota>.toml` no workspace. `--dry-run` gera e assina sem chamar o WS. `--verbose` mostra XML assinado e respostas SOAP brutas. Por padrão consulta a confirmação por RPS; `--no-confirmation-wait` desliga essa espera. `--wait-timeout` ajusta o timeout da requisição. |
 | `query` | Consulta NFS-e por `--numero` ou por `--data-inicial`/`--data-final`. |
 | `cancel` | Cancela uma NFS-e autorizada: exige `--numero` e `--codigo` (1=erro emissão, 2=serviço não prestado, 3=erro processamento, 4=duplicidade). |
 | `env <homologacao\|producao>` | Alterna o ambiente ativo. |
@@ -113,6 +113,8 @@ serie_rps          = "A"
 proximo_numero_rps = 1
 codigo_municipio   = "1234567"
 aliquota_iss       = 5.0
+confirm_timeout    = "2m"
+confirm_interval   = "5s"
 ```
 
 O `path` do certificado pode ser absoluto ou relativo. Quando relativo,
@@ -129,6 +131,17 @@ Após cada emissão bem-sucedida, `proximo_numero_rps` é incrementado e o
 config é reescrito atomicamente (arquivo temporário + rename) — seu contador
 sequencial sobrevive a crashes durante a escrita.
 
+Quando o `GerarNfse` responde de forma assíncrona, o `emit` consulta
+`ConsultarNfsePorRps` até encontrar a NFS-e ou até `confirm_timeout`.
+`confirm_interval` controla o intervalo entre tentativas. Use
+`--no-confirmation-wait` apenas quando quiser retornar imediatamente após o
+envio.
+
+Durante a emissão, a CLI mostra o andamento em `stderr` (`nota`, `xml`,
+`assinatura`, `prefeitura`, `confirmação`, `config`). Em TTY, esse progresso
+é compacto e animado; em scripts é texto simples. Com `--json`, não há
+progresso nem ANSI fora do JSON em `stdout`.
+
 O cliente descobre o endpoint SOAP, o namespace e o `SOAPAction` por
 operação a partir do WSDL informado em `[soap]` (espelha o comportamento do
 módulo `soap` do Node usado pelas implementações em TypeScript).
@@ -144,7 +157,7 @@ internal/abrasf          -> tipos XML, builders, parser de resposta
 internal/xmlsig          -> loader PKCS#12 + XMLDSig (RSA-SHA1, C14N inclusivo)
 internal/soap            -> cliente SOAP 1.1 com mTLS + basic auth + auto-discovery do WSDL
 internal/service         -> orquestra Emit/Query/Cancel
-internal/render          -> renderizadores humano (tabelas coloridas) e JSON
+internal/render          -> renderizadores humano (saída semântica) e JSON
 internal/logging         -> factory de slog handler (sem emojis, nunca em stdout)
 testdata/golden          -> envelopes XML comitados usados pelos testes do abrasf
 ```

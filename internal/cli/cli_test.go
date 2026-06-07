@@ -27,6 +27,17 @@ func runCmd(t *testing.T, args ...string) (string, error) {
 	return out.String(), err
 }
 
+func runCmdSplit(t *testing.T, args ...string) (stdout, stderr string, err error) {
+	t.Helper()
+	root := cli.NewRoot()
+	var out, errOut bytes.Buffer
+	root.SetOut(&out)
+	root.SetErr(&errOut)
+	root.SetArgs(args)
+	err = root.Execute()
+	return out.String(), errOut.String(), err
+}
+
 func TestInitCreatesProject(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "proj")
 	out, err := runCmd(t, "init", dir)

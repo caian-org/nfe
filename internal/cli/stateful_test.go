@@ -43,6 +43,38 @@ func fakeABRASF(t *testing.T, responseBody string) *httptest.Server {
 	return srv
 }
 
+func fakeABRASFByAction(t *testing.T, responses map[string]string) *httptest.Server {
+	t.Helper()
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet || strings.HasSuffix(r.URL.RequestURI(), "?wsdl") {
+			w.Header().Set("Content-Type", "text/xml")
+			w.Write([]byte(`<?xml version="1.0"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" targetNamespace="` + srv.URL + `">
+  <binding name="B" type="P">
+    <operation name="GerarNfse"><soap:operation soapAction="nfs#GerarNfse"/></operation>
+    <operation name="ConsultarNfseServicoPrestado"><soap:operation soapAction="nfs#ConsultarNfseServicoPrestado"/></operation>
+    <operation name="ConsultarNfsePorRps"><soap:operation soapAction="nfs#ConsultarNfsePorRps"/></operation>
+    <operation name="CancelarNfse"><soap:operation soapAction="nfs#CancelarNfse"/></operation>
+  </binding>
+  <service name="S"><port name="P" binding="tns:B"><soap:address location="` + srv.URL + `/svc"/></port></service>
+</definitions>`))
+			return
+		}
+		body, _ := io.ReadAll(r.Body)
+		action := "default"
+		for candidate := range responses {
+			if strings.Contains(string(body), candidate) {
+				action = candidate
+				break
+			}
+		}
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		w.Write([]byte(responses[action]))
+	}))
+	return srv
+}
+
 // workspaceWith returns a workspace with a config that targets srv (a fake ABRASF
 // server serving WSDL at GET and SOAP at POST).
 func workspaceWith(t *testing.T, srv *httptest.Server) string {
@@ -55,6 +87,16 @@ func workspaceWith(t *testing.T, srv *httptest.Server) string {
 	workspace := t.TempDir()
 	require.NoError(t, config.Save(filepath.Join(workspace, "config.toml"), cfg))
 	return workspace
+}
+
+func setConfirmationDurations(t *testing.T, workspace, timeout, interval string) {
+	t.Helper()
+	cfgPath := filepath.Join(workspace, "config.toml")
+	cfg, err := config.Load(cfgPath)
+	require.NoError(t, err)
+	cfg.Configuracoes.ConfirmTimeout = timeout
+	cfg.Configuracoes.ConfirmInterval = interval
+	require.NoError(t, config.Save(cfgPath, cfg))
 }
 
 func notaFile(t *testing.T, workspace, id string) string {
@@ -112,6 +154,61 @@ func TestEmitDryRunNoNetwork(t *testing.T) {
 	assert.Equal(t, 1, reloaded.Configuracoes.ProximoNumeroRPS)
 }
 
+func TestEmitDryRunProgressGoesToStderr(t *testing.T) {
+	cfg := config.Default()
+	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
+	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
+	cfg.Autenticacao.Usuario = "u"
+	cfg.Autenticacao.Senha = "p"
+	workspace := t.TempDir()
+	require.NoError(t, config.Save(filepath.Join(workspace, "config.toml"), cfg))
+	notaID := notaFile(t, workspace, "nota")
+
+	stdout, stderr, err := runCmdSplit(t, "--workspace", workspace, "emit", notaID, "--dry-run")
+	require.NoError(t, err)
+	assert.Contains(t, stdout, "dry-run")
+	assert.Contains(t, stdout, "RPS número")
+	assert.NotContains(t, stdout, "nfe emit ·")
+	assert.Contains(t, stderr, "nfe emit · nota")
+	assert.Contains(t, stderr, "xml")
+	assert.Contains(t, stderr, "config")
+}
+
+func TestEmitDryRunJSONDoesNotRenderProgress(t *testing.T) {
+	cfg := config.Default()
+	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
+	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
+	cfg.Autenticacao.Usuario = "u"
+	cfg.Autenticacao.Senha = "p"
+	workspace := t.TempDir()
+	require.NoError(t, config.Save(filepath.Join(workspace, "config.toml"), cfg))
+	notaID := notaFile(t, workspace, "nota")
+
+	stdout, stderr, err := runCmdSplit(t, "--json", "--workspace", workspace, "emit", notaID, "--dry-run")
+	require.NoError(t, err)
+	assert.Empty(t, stderr)
+	var got map[string]any
+	require.NoError(t, json.Unmarshal([]byte(stdout), &got))
+	assert.Equal(t, "emit", got["event"])
+}
+
+func TestEmitDryRunVerboseRendersSignedXML(t *testing.T) {
+	cfg := config.Default()
+	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
+	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
+	cfg.Autenticacao.Usuario = "u"
+	cfg.Autenticacao.Senha = "p"
+	workspace := t.TempDir()
+	require.NoError(t, config.Save(filepath.Join(workspace, "config.toml"), cfg))
+	notaID := notaFile(t, workspace, "nota")
+
+	out, err := runCmd(t, "--workspace", workspace, "emit", notaID, "--dry-run", "--verbose")
+	require.NoError(t, err)
+	assert.Contains(t, out, "XML assinado:")
+	assert.Contains(t, out, "<GerarNfseEnvio")
+	assert.NotContains(t, out, "resposta SOAP:")
+}
+
 func TestEmitSuccessBumpsCounterOnDisk(t *testing.T) {
 	srv := fakeABRASF(t, soapEnvelope(`<GerarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><ListaNfse><CompNfse><Nfse><InfNfse><Numero>9999</Numero></InfNfse></Nfse></CompNfse></ListaNfse></GerarNfseResposta>`))
 	defer srv.Close()
@@ -127,6 +224,70 @@ func TestEmitSuccessBumpsCounterOnDisk(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, reloaded.Configuracoes.ProximoNumeroRPS,
 		"after a successful emit, the on-disk counter must be one higher")
+}
+
+func TestEmitVerboseRendersSOAPResponse(t *testing.T) {
+	body := soapEnvelope(`<GerarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><ListaNfse><CompNfse><Nfse><InfNfse><Numero>9999</Numero></InfNfse></Nfse></CompNfse></ListaNfse></GerarNfseResposta>`)
+	srv := fakeABRASF(t, body)
+	defer srv.Close()
+
+	workspace := workspaceWith(t, srv)
+	notaID := notaFile(t, workspace, "mova")
+	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--verbose")
+	require.NoError(t, err)
+	assert.Contains(t, out, "XML assinado:")
+	assert.Contains(t, out, "resposta SOAP:")
+	assert.Contains(t, out, "<GerarNfseResposta")
+}
+
+func TestEmitPollsRPSConfirmationWhenResponseIsAsync(t *testing.T) {
+	srv := fakeABRASFByAction(t, map[string]string{
+		"GerarNfseRequest":           soapEnvelope(`<GerarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><Mensagem>Solicitação recebida! Aguarde a confirmação da Nota Fiscal pelo Sefaz/ADN.</Mensagem></GerarNfseResposta>`),
+		"ConsultarNfsePorRpsRequest": soapEnvelope(`<ConsultarNfsePorRpsResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><CompNfse><Nfse><InfNfse><Numero>8888</Numero><CodigoVerificacao>ABC123</CodigoVerificacao><DataEmissao>2026-06-07T10:00:00-03:00</DataEmissao><UrlVisualizacao>https://example.test/nfse/8888</UrlVisualizacao><DeclaracaoPrestacaoServico><InfDeclaracaoPrestacaoServico><Servico><Valores><ValorServicos>100.00</ValorServicos></Valores></Servico><TomadorServico><RazaoSocial>ACME</RazaoSocial></TomadorServico></InfDeclaracaoPrestacaoServico></DeclaracaoPrestacaoServico></InfNfse></Nfse></CompNfse></ConsultarNfsePorRpsResposta>`),
+	})
+	defer srv.Close()
+
+	workspace := workspaceWith(t, srv)
+	notaID := notaFile(t, workspace, "mova")
+	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--verbose")
+	require.NoError(t, err)
+	assert.Contains(t, out, "NFS-e emitida")
+	assert.Contains(t, out, "8888")
+	assert.Contains(t, out, "ABC123")
+	assert.Contains(t, out, "https://example.test/nfse/8888")
+	assert.Contains(t, out, "resposta consulta RPS:")
+}
+
+func TestEmitKeepsPendingWhenRPSConfirmationHasOnlySituacao(t *testing.T) {
+	srv := fakeABRASFByAction(t, map[string]string{
+		"GerarNfseRequest":           soapEnvelope(`<GerarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><Mensagem>Solicitação recebida! Aguarde a confirmação da Nota Fiscal pelo Sefaz/ADN.</Mensagem></GerarNfseResposta>`),
+		"ConsultarNfsePorRpsRequest": soapEnvelope(`<ConsultarNfseRpsResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><CompNfse><Situacao><Rps><Numero>7</Numero><Serie>00000</Serie><Tipo>1</Tipo></Rps><Status>0</Status><Mensagem>Aguardando envio para o ADN</Mensagem></Situacao></CompNfse></ConsultarNfseRpsResposta>`),
+	})
+	defer srv.Close()
+
+	workspace := workspaceWith(t, srv)
+	setConfirmationDurations(t, workspace, "20ms", "1ms")
+	notaID := notaFile(t, workspace, "mova")
+	out, err := runCmd(t, "-w", workspace, "emit", notaID)
+	require.NoError(t, err)
+	assert.Contains(t, out, "solicitação de NFS-e enviada")
+	assert.Contains(t, out, "solicitação recebida; confirmação da NFS-e ainda pendente")
+	assert.NotContains(t, out, "NFS-e número")
+}
+
+func TestEmitNoConfirmationWaitSkipsRPSPolling(t *testing.T) {
+	srv := fakeABRASFByAction(t, map[string]string{
+		"GerarNfseRequest":           soapEnvelope(`<GerarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><Mensagem>Solicitação recebida! Aguarde a confirmação da Nota Fiscal pelo Sefaz/ADN.</Mensagem></GerarNfseResposta>`),
+		"ConsultarNfsePorRpsRequest": soapEnvelope(`<ConsultarNfsePorRpsResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><CompNfse><Nfse><InfNfse><Numero>8888</Numero></InfNfse></Nfse></CompNfse></ConsultarNfsePorRpsResposta>`),
+	})
+	defer srv.Close()
+
+	workspace := workspaceWith(t, srv)
+	notaID := notaFile(t, workspace, "mova")
+	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--no-confirmation-wait")
+	require.NoError(t, err)
+	assert.Contains(t, out, "solicitação recebida; confirmação da NFS-e ainda pendente")
+	assert.NotContains(t, out, "8888")
 }
 
 func TestEmitErrorsLeaveCounterAlone(t *testing.T) {

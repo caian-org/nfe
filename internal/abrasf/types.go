@@ -162,6 +162,15 @@ type ConsultarNfseServicoPrestadoEnvio struct {
 	Pagina             int                 `xml:"Pagina"`
 }
 
+// ConsultarNfsePorRpsEnvio queries an authorized NFS-e by the RPS identifier
+// used during emission.
+type ConsultarNfsePorRpsEnvio struct {
+	XMLName          xml.Name         `xml:"ConsultarNfseRpsEnvio"`
+	Xmlns            string           `xml:"xmlns,attr"`
+	IdentificacaoRps IdentificacaoRps `xml:"IdentificacaoRps"`
+	Prestador        Prestador        `xml:"Prestador"`
+}
+
 // PeriodoCompetencia is the date-range filter used by query.
 type PeriodoCompetencia struct {
 	XMLName     xml.Name `xml:"PeriodoCompetencia"`
