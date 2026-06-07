@@ -36,20 +36,17 @@ func BuildRPS(cfg *config.Config, in *nota.Input, today time.Time) *InfDeclaraca
 		issRetidoFlag = ISSRetidoSim
 	}
 
-	// Replicates the TS quirk: when issRetido is true, valorIss is reported as
-	// the calculated retention; otherwise it is reported as 0.
 	calcIss := in.Servico.ValorServicos * aliquota / 100
-	var valorIss Dec2
-	if in.Servico.IssRetido {
-		valorIss = Dec2(0)
-	} else {
-		valorIss = Dec2(calcIss)
-	}
+	valorIss := Dec2(calcIss)
 
 	aliq := Dec1(aliquota)
 	informacoes := in.Observacoes
 	if informacoes == "" {
 		informacoes = "Informação Complementar Solicitada"
+	}
+	discriminacao := in.Servico.Discriminacao
+	if in.Observacoes != "" {
+		discriminacao += "\n\n" + in.Observacoes
 	}
 
 	servico := Servico{
@@ -72,7 +69,7 @@ func BuildRPS(cfg *config.Config, in *nota.Input, today time.Time) *InfDeclaraca
 		ResponsavelRetencao: RegimeEspecialPadrao, // TS hardcodes "1".
 		ItemListaServico:    in.Servico.ItemListaServico,
 		CodigoCnae:          cnae,
-		Discriminacao:       in.Servico.Discriminacao,
+		Discriminacao:       discriminacao,
 		CodigoMunicipio:     cfg.Configuracoes.CodigoMunicipio,
 		CodigoPais:          "1058", // TS hardcodes Brazil.
 		ExigibilidadeISS:    ExigibilidadeExigivel,

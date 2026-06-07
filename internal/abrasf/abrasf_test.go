@@ -107,6 +107,7 @@ func TestBuildRPSFromInput(t *testing.T) {
 	assert.Equal(t, "2026-05-26", inf.Competencia)
 	assert.Equal(t, 15000.0, float64(inf.Servico.Valores.ValorServicos))
 	assert.Equal(t, abrasf.ISSRetidoNao, inf.Servico.IssRetido)
+	assert.Equal(t, "DESCRIÇÃO DO SERVIÇO PRESTADO\n\nObservações sobre o serviço", inf.Servico.Discriminacao)
 	assert.Equal(t, "Observações sobre o serviço", inf.InformacoesComplementares)
 	require.NotNil(t, inf.TomadorServico)
 	require.NotNil(t, inf.TomadorServico.IdentificacaoTomador)
@@ -139,14 +140,14 @@ func TestBuildRPSFallsBackToConfigAliquota(t *testing.T) {
 	assert.Equal(t, 7.0, float64(*inf.Servico.Valores.Aliquota))
 }
 
-func TestBuildRPSIssRetidoTrueZeroesValorIss(t *testing.T) {
+func TestBuildRPSIssRetidoTrueCalculatesValorIss(t *testing.T) {
 	cfg := fixtureConfig()
 	in := fixtureInput()
 	in.Servico.IssRetido = true
 	inf := abrasf.BuildRPS(cfg, in, fixtureDate())
 	assert.Equal(t, abrasf.ISSRetidoSim, inf.Servico.IssRetido)
 	require.NotNil(t, inf.Servico.Valores.ValorIss)
-	assert.Equal(t, 0.0, float64(*inf.Servico.Valores.ValorIss))
+	assert.Equal(t, 300.0, float64(*inf.Servico.Valores.ValorIss))
 }
 
 func TestBuildRPSCPFTomador(t *testing.T) {

@@ -321,6 +321,37 @@ func TestQueryByNumeroRendersTable(t *testing.T) {
 	assert.Contains(t, out, "ACME")
 }
 
+func TestQueryParsesProviderLinkAliases(t *testing.T) {
+	cases := []struct {
+		name string
+		tag  string
+		url  string
+	}{
+		{name: "LinkNota", tag: "LinkNota", url: "https://example.test/nfse?id=42&amp;print=1"},
+		{name: "LinkImpressao", tag: "LinkImpressao", url: "https://example.test/impressao?id=42&amp;print=1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `<ConsultarNfseResposta><ListaNfse><CompNfse><Nfse><InfNfse><Numero>42</Numero><CodigoVerificacao>ABC</CodigoVerificacao><DataEmissao>2026-05-01T10:00:00-03:00</DataEmissao><` + tc.tag + `>` + tc.url + `</` + tc.tag + `><DeclaracaoPrestacaoServico><InfDeclaracaoPrestacaoServico><Servico><Valores><ValorServicos>1500.00</ValorServicos></Valores></Servico><TomadorServico><RazaoSocial>ACME</RazaoSocial></TomadorServico></InfDeclaracaoPrestacaoServico></DeclaracaoPrestacaoServico></InfNfse></Nfse></CompNfse></ListaNfse></ConsultarNfseResposta>`
+			srv := fakeABRASF(t, soapEnvelope(body))
+			defer srv.Close()
+
+			workspace := workspaceWith(t, srv)
+			out, err := runCmd(t, "--json", "-w", workspace, "query", "-n", "42")
+			require.NoError(t, err)
+			var got map[string]any
+			require.NoError(t, json.Unmarshal([]byte(out), &got))
+			q := got["query"].(map[string]any)
+			nfses := q["nfses"].([]any)
+			require.Len(t, nfses, 1)
+			nfse := nfses[0].(map[string]any)
+			assert.Equal(t, "42", nfse["numero"])
+			assert.Equal(t, strings.ReplaceAll(tc.url, "&amp;", "&"), nfse["url"])
+		})
+	}
+}
+
 func TestQueryRequiresFilter(t *testing.T) {
 	srv := fakeABRASF(t, `<should-not-be-called/>`)
 	defer srv.Close()

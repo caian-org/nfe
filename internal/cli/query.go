@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/xml"
 	"errors"
+	"html"
 	"strings"
 	"time"
 
@@ -121,6 +122,8 @@ func parseQueriedNFSes(body []byte) []render.QueriedNFSe {
 		UrlVisualizacao   string      `xml:"UrlVisualizacao"`
 		UrlDownload       string      `xml:"UrlDownload"`
 		Link              string      `xml:"Link"`
+		LinkNota          string      `xml:"LinkNota"`
+		LinkImpressao     string      `xml:"LinkImpressao"`
 		ValoresNfse       valoresNfse `xml:"ValoresNfse"`
 		Declaracao        declaracao  `xml:"DeclaracaoPrestacaoServico"`
 	}
@@ -157,7 +160,7 @@ func parseQueriedNFSes(body []byte) []render.QueriedNFSe {
 			DataEmissao:        formatEmissao(strings.TrimSpace(inf.DataEmissao)),
 			ValorServicos:      valor,
 			RazaoSocialTomador: strings.TrimSpace(inf.Declaracao.InfDec.TomadorServico.RazaoSocial),
-			URL:                firstNonEmpty(inf.Url, inf.URL, inf.UrlNfse, inf.UrlVisualizacao, inf.UrlDownload, inf.Link),
+			URL:                firstNonEmpty(inf.Url, inf.URL, inf.UrlNfse, inf.UrlVisualizacao, inf.UrlDownload, inf.Link, inf.LinkNota, inf.LinkImpressao),
 		}
 		if nfse.Numero == "" && nfse.CodigoVerificacao == "" && nfse.DataEmissao == "" && nfse.ValorServicos == "" && nfse.RazaoSocialTomador == "" && nfse.URL == "" {
 			continue
@@ -170,7 +173,7 @@ func parseQueriedNFSes(body []byte) []render.QueriedNFSe {
 func firstNonEmpty(values ...string) string {
 	for _, v := range values {
 		if s := strings.TrimSpace(v); s != "" {
-			return s
+			return html.UnescapeString(s)
 		}
 	}
 	return ""
