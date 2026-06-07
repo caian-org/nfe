@@ -13,7 +13,11 @@ func newStatusCmd(gf *globalFlags) *cobra.Command {
 		Short: "Mostra um resumo da configuração ativa",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load(gf.configPath)
+			configPath, err := gf.configPath()
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
 			}

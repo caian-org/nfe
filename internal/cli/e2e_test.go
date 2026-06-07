@@ -27,12 +27,12 @@ func TestEndToEndDryRunMatchesGolden(t *testing.T) {
 	_, err := runCmd(t, "init", proj)
 	require.NoError(t, err)
 	cfgPath := filepath.Join(proj, "config.toml")
-	notaPath := filepath.Join(proj, "example-nota.toml")
+	notaPath := filepath.Join(proj, "notas", "example.toml")
 	require.FileExists(t, cfgPath)
 	require.FileExists(t, notaPath)
 
 	// 2. Drive emit --dry-run --json, parse the structured output.
-	out, err := runCmd(t, "--json", "-c", cfgPath, "emit", notaPath, "--dry-run")
+	out, err := runCmd(t, "--json", "-w", proj, "emit", "example", "--dry-run")
 	require.NoError(t, err)
 
 	var resp struct {
@@ -66,27 +66,37 @@ func TestEndToEndDryRunMatchesGolden(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, reloaded.Configuracoes.ProximoNumeroRPS)
 
-	// 5. The example-nota.toml that init wrote must round-trip cleanly: a
+	// 5. The notas/example.toml that init wrote must round-trip cleanly: a
 	// fresh `os.ReadFile` returns the same content nota.Load already parsed.
 	contents, err := os.ReadFile(notaPath)
 	require.NoError(t, err)
 	assert.Contains(t, string(contents), "DESCRIÇÃO DO SERVIÇO PRESTADO")
 }
 
+func TestEmitDefaultWorkspaceResolvesNotaUnderHome(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	_, err := runCmd(t, "init")
+	require.NoError(t, err)
+
+	out, err := runCmd(t, "emit", "example", "--dry-run")
+	require.NoError(t, err)
+	assert.Contains(t, out, "dry-run")
+	assert.Contains(t, out, "RPS número")
+}
+
 func TestNoEmojisInAnyHumanOutput(t *testing.T) {
 	dir := filepath.Join(t.TempDir(), "proj")
 	_, err := runCmd(t, "init", dir)
 	require.NoError(t, err)
-	cfgPath := filepath.Join(dir, "config.toml")
 
 	outputs := map[string]func() (string, error){
 		"init":   func() (string, error) { return runCmd(t, "init", t.TempDir()) },
-		"env":    func() (string, error) { return runCmd(t, "-c", cfgPath, "env", "producao") },
-		"status": func() (string, error) { return runCmd(t, "-c", cfgPath, "status") },
+		"env":    func() (string, error) { return runCmd(t, "-w", dir, "env", "producao") },
+		"status": func() (string, error) { return runCmd(t, "-w", dir, "status") },
 		"emit-dry": func() (string, error) {
-			return runCmd(t, "-c", cfgPath, "emit", filepath.Join(dir, "example-nota.toml"), "--dry-run")
+			return runCmd(t, "-w", dir, "emit", "example", "--dry-run")
 		},
-		"query-bad": func() (string, error) { o, _ := runCmd(t, "-c", cfgPath, "query"); return o, nil },
+		"query-bad": func() (string, error) { o, _ := runCmd(t, "-w", dir, "query"); return o, nil },
 	}
 
 	emojis := []string{"✅", "❌", "🔄", "📤", "⏳", "📄", "📝", "🔑", "🎉"}

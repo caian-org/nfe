@@ -43,21 +43,21 @@ func fakeABRASF(t *testing.T, responseBody string) *httptest.Server {
 	return srv
 }
 
-// configWith returns a path to a config that targets srv (a fake ABRASF
+// workspaceWith returns a workspace with a config that targets srv (a fake ABRASF
 // server serving WSDL at GET and SOAP at POST).
-func configWith(t *testing.T, srv *httptest.Server) string {
+func workspaceWith(t *testing.T, srv *httptest.Server) string {
 	t.Helper()
 	cfg := config.Default()
 	cfg.Autenticacao.Usuario = "u"
 	cfg.Autenticacao.Senha = "p"
 	cfg.SOAP.WSDLHomologacao = srv.URL + "?wsdl"
 	cfg.SOAP.WSDLProducao = srv.URL + "?wsdl"
-	path := filepath.Join(t.TempDir(), "config.toml")
-	require.NoError(t, config.Save(path, cfg))
-	return path
+	workspace := t.TempDir()
+	require.NoError(t, config.Save(filepath.Join(workspace, "config.toml"), cfg))
+	return workspace
 }
 
-func notaFile(t *testing.T) string {
+func notaFile(t *testing.T, workspace, id string) string {
 	t.Helper()
 	body := `
 [tomador]
@@ -78,9 +78,11 @@ valor_servicos = 100.0
 item_lista_servico = "0101"
 aliquota = 5.0
 `
-	path := filepath.Join(t.TempDir(), "nota.toml")
+	notasPath := filepath.Join(workspace, "notas")
+	require.NoError(t, os.MkdirAll(notasPath, 0o755))
+	path := filepath.Join(notasPath, id+".toml")
 	require.NoError(t, os.WriteFile(path, []byte(body), 0o644))
-	return path
+	return id
 }
 
 func soapEnvelope(body string) string {
@@ -94,10 +96,12 @@ func TestEmitDryRunNoNetwork(t *testing.T) {
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
 	cfg.Autenticacao.Senha = "p"
-	cfgPath := filepath.Join(t.TempDir(), "config.toml")
+	workspace := t.TempDir()
+	cfgPath := filepath.Join(workspace, "config.toml")
 	require.NoError(t, config.Save(cfgPath, cfg))
+	notaID := notaFile(t, workspace, "nota")
 
-	out, err := runCmd(t, "-c", cfgPath, "emit", notaFile(t), "--dry-run")
+	out, err := runCmd(t, "--workspace", workspace, "emit", notaID, "--dry-run")
 	require.NoError(t, err)
 	assert.Contains(t, out, "dry-run")
 	assert.Contains(t, out, "RPS número")
@@ -112,13 +116,14 @@ func TestEmitSuccessBumpsCounterOnDisk(t *testing.T) {
 	srv := fakeABRASF(t, soapEnvelope(`<GerarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd"><ListaNfse><CompNfse><Nfse><InfNfse><Numero>9999</Numero></InfNfse></Nfse></CompNfse></ListaNfse></GerarNfseResposta>`))
 	defer srv.Close()
 
-	cfgPath := configWith(t, srv)
-	out, err := runCmd(t, "-c", cfgPath, "emit", notaFile(t))
+	workspace := workspaceWith(t, srv)
+	notaID := notaFile(t, workspace, "mova")
+	out, err := runCmd(t, "-w", workspace, "emit", notaID)
 	require.NoError(t, err)
 	assert.Contains(t, out, "NFS-e emitida")
 	assert.Contains(t, out, "9999")
 
-	reloaded, err := config.Load(cfgPath)
+	reloaded, err := config.Load(filepath.Join(workspace, "config.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, 2, reloaded.Configuracoes.ProximoNumeroRPS,
 		"after a successful emit, the on-disk counter must be one higher")
@@ -128,13 +133,14 @@ func TestEmitErrorsLeaveCounterAlone(t *testing.T) {
 	srv := fakeABRASF(t, soapEnvelope(`<GerarNfseResposta><ListaMensagemRetorno><MensagemRetorno><Codigo>E1</Codigo><Mensagem>rejeitado</Mensagem></MensagemRetorno></ListaMensagemRetorno></GerarNfseResposta>`))
 	defer srv.Close()
 
-	cfgPath := configWith(t, srv)
-	out, err := runCmd(t, "-c", cfgPath, "emit", notaFile(t))
+	workspace := workspaceWith(t, srv)
+	notaID := notaFile(t, workspace, "mova")
+	out, err := runCmd(t, "-w", workspace, "emit", notaID)
 	require.NoError(t, err, "WS rejection must NOT surface as a CLI error; the renderer handles it")
 	assert.Contains(t, out, "falha na emissão")
 	assert.Contains(t, out, "rejeitado")
 
-	reloaded, err := config.Load(cfgPath)
+	reloaded, err := config.Load(filepath.Join(workspace, "config.toml"))
 	require.NoError(t, err)
 	assert.Equal(t, 1, reloaded.Configuracoes.ProximoNumeroRPS)
 }
@@ -146,8 +152,8 @@ func TestQueryByNumeroRendersTable(t *testing.T) {
 	srv := fakeABRASF(t, soapEnvelope(`<ConsultarNfseResposta><ListaNfse><CompNfse><Nfse><InfNfse><Numero>42</Numero><CodigoVerificacao>ABC</CodigoVerificacao><DataEmissao>2026-05-01T10:00:00-03:00</DataEmissao><ValoresNfse><BaseCalculo>1500.00</BaseCalculo></ValoresNfse><DeclaracaoPrestacaoServico><InfDeclaracaoPrestacaoServico><Servico><Valores><ValorServicos>1500.00</ValorServicos></Valores></Servico><TomadorServico><RazaoSocial>ACME</RazaoSocial></TomadorServico></InfDeclaracaoPrestacaoServico></DeclaracaoPrestacaoServico></InfNfse></Nfse></CompNfse></ListaNfse></ConsultarNfseResposta>`))
 	defer srv.Close()
 
-	cfgPath := configWith(t, srv)
-	out, err := runCmd(t, "-c", cfgPath, "query", "-n", "42")
+	workspace := workspaceWith(t, srv)
+	out, err := runCmd(t, "-w", workspace, "query", "-n", "42")
 	require.NoError(t, err)
 	assert.Contains(t, out, "42")
 	assert.Contains(t, out, "ABC")
@@ -158,8 +164,8 @@ func TestQueryRequiresFilter(t *testing.T) {
 	srv := fakeABRASF(t, `<should-not-be-called/>`)
 	defer srv.Close()
 
-	cfgPath := configWith(t, srv)
-	_, err := runCmd(t, "-c", cfgPath, "query")
+	workspace := workspaceWith(t, srv)
+	_, err := runCmd(t, "-w", workspace, "query")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "--numero ou ambos --data-inicial")
 }
@@ -168,8 +174,8 @@ func TestQueryJSON(t *testing.T) {
 	srv := fakeABRASF(t, soapEnvelope(`<r><ListaNfse><CompNfse><Nfse><InfNfse><Numero>1</Numero></InfNfse></Nfse></CompNfse></ListaNfse></r>`))
 	defer srv.Close()
 
-	cfgPath := configWith(t, srv)
-	out, err := runCmd(t, "--json", "-c", cfgPath, "query", "-n", "1")
+	workspace := workspaceWith(t, srv)
+	out, err := runCmd(t, "--json", "-w", workspace, "query", "-n", "1")
 	require.NoError(t, err)
 	var got map[string]any
 	require.NoError(t, json.Unmarshal([]byte(out), &got))
@@ -183,8 +189,8 @@ func TestCancelSuccess(t *testing.T) {
 	srv := fakeABRASF(t, soapEnvelope(`<CancelarNfseResposta><Confirmacao/></CancelarNfseResposta>`))
 	defer srv.Close()
 
-	cfgPath := configWith(t, srv)
-	out, err := runCmd(t, "-c", cfgPath, "cancel", "-n", "100", "--codigo", "1")
+	workspace := workspaceWith(t, srv)
+	out, err := runCmd(t, "-w", workspace, "cancel", "-n", "100", "--codigo", "1")
 	require.NoError(t, err)
 	assert.Contains(t, out, "NFS-e cancelada")
 	assert.Contains(t, out, "100")
@@ -194,8 +200,8 @@ func TestCancelRejectsBadCodigo(t *testing.T) {
 	srv := fakeABRASF(t, `<should-not-be-called/>`)
 	defer srv.Close()
 
-	cfgPath := configWith(t, srv)
-	_, err := runCmd(t, "-c", cfgPath, "cancel", "-n", "100", "--codigo", "99")
+	workspace := workspaceWith(t, srv)
+	_, err := runCmd(t, "-w", workspace, "cancel", "-n", "100", "--codigo", "99")
 	require.Error(t, err)
 	assert.Contains(t, strings.ToLower(err.Error()), "codigo")
 }
@@ -204,8 +210,8 @@ func TestCancelMessagesSurfaced(t *testing.T) {
 	srv := fakeABRASF(t, soapEnvelope(`<CancelarNfseResposta><ListaMensagemRetorno><MensagemRetorno><Codigo>X1</Codigo><Mensagem>nope</Mensagem></MensagemRetorno></ListaMensagemRetorno></CancelarNfseResposta>`))
 	defer srv.Close()
 
-	cfgPath := configWith(t, srv)
-	out, err := runCmd(t, "-c", cfgPath, "cancel", "-n", "100", "--codigo", "2")
+	workspace := workspaceWith(t, srv)
+	out, err := runCmd(t, "-w", workspace, "cancel", "-n", "100", "--codigo", "2")
 	require.NoError(t, err)
 	assert.Contains(t, out, "falha no cancelamento")
 	assert.Contains(t, out, "nope")

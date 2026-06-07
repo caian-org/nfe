@@ -31,7 +31,11 @@ func newQueryCmd(gf *globalFlags) *cobra.Command {
 				return errors.New("informe --numero ou ambos --data-inicial e --data-final")
 			}
 
-			cfg, err := config.Load(gf.configPath)
+			configPath, err := gf.configPath()
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(configPath)
 			if err != nil {
 				return err
 			}

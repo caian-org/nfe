@@ -21,15 +21,23 @@ func newEmitCmd(gf *globalFlags) *cobra.Command {
 		timeout time.Duration
 	)
 	cmd := &cobra.Command{
-		Use:   "emit <arquivo>",
-		Short: "Emite uma NFS-e a partir de um arquivo TOML",
+		Use:   "emit <nota>",
+		Short: "Emite uma NFS-e a partir de uma nota do workspace",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			cfg, err := config.Load(gf.configPath)
+			configPath, err := gf.configPath()
 			if err != nil {
 				return err
 			}
-			input, err := nota.Load(args[0])
+			notaPath, err := gf.notaPath(args[0])
+			if err != nil {
+				return err
+			}
+			cfg, err := config.Load(configPath)
+			if err != nil {
+				return err
+			}
+			input, err := nota.Load(notaPath)
 			if err != nil {
 				return err
 			}
@@ -69,7 +77,7 @@ func newEmitCmd(gf *globalFlags) *cobra.Command {
 			case err == nil:
 				info.Sucesso = true
 				// Persist the bumped counter only when emit succeeded.
-				if saveErr := config.Save(gf.configPath, cfg); saveErr != nil {
+				if saveErr := config.Save(configPath, cfg); saveErr != nil {
 					return fmt.Errorf("emissão concluída mas falhou ao salvar configuração: %w", saveErr)
 				}
 			case errors.As(err, &msgErr):
