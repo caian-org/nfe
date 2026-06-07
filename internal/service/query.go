@@ -56,6 +56,46 @@ func (s *Service) Query(ctx context.Context, q abrasf.ConsultaQuery) (*QueryResu
 	return result, nil
 }
 
+// QueryByRPS consults an NFS-e by the RPS identifier used during emission.
+func (s *Service) QueryByRPS(ctx context.Context, rps abrasf.IdentificacaoRps) (*QueryResult, error) {
+	xmlBytes, err := abrasf.BuildConsultarPorRPS(
+		s.cfg.Prestador.CNPJ,
+		s.cfg.Prestador.InscricaoMunicipal,
+		rps,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.ensureSOAP(); err != nil {
+		return nil, err
+	}
+	resp, err := s.soap.Call(ctx, "ConsultarNfsePorRps", xmlBytes)
+	if err != nil {
+		return &QueryResult{RequestXML: xmlBytes, RawResponse: resp}, fmt.Errorf("query: %w", err)
+	}
+
+	bodyInner, err := soapExtract(resp)
+	if err != nil {
+		return nil, fmt.Errorf("query: parse do envelope SOAP: %w", err)
+	}
+	payload, err := abrasf.ParseResponse(bodyInner)
+	if err != nil {
+		return nil, fmt.Errorf("query: parse da resposta: %w", err)
+	}
+
+	result := &QueryResult{
+		RequestXML:  xmlBytes,
+		RawResponse: resp,
+		BodyInner:   payload.Raw,
+		Mensagens:   payload.Mensagens,
+	}
+	if payload.HasErrors() {
+		return result, &MessagesError{Action: "query", Mensagens: payload.Mensagens, Raw: payload.Raw}
+	}
+	return result, nil
+}
+
 // soapExtract is a thin shim around soap.ExtractBody, kept in this package
 // so the service tests don't have to import it directly.
 func soapExtract(envelope []byte) ([]byte, error) {

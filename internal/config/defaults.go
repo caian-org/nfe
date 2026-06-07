@@ -38,6 +38,8 @@ func Default() *Config {
 			ProximoNumeroRPS: 1,
 			CodigoMunicipio:  "0000000",
 			AliquotaISS:      5.0,
+			ConfirmTimeout:   DefaultConfirmTimeout,
+			ConfirmInterval:  DefaultConfirmInterval,
 		},
 	}
 }

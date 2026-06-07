@@ -29,23 +29,46 @@ type soapCaller interface {
 // The SOAP client is built lazily on first use so `emit --dry-run` works
 // offline even when the WSDL endpoint is unreachable.
 type Service struct {
-	cfg     *config.Config
-	soap    soapCaller
-	soapErr error
-	soapOne sync.Once
-	tlsCert *tls.Certificate
-	signer  *xmlsig.Signer
+	cfg      *config.Config
+	soap     soapCaller
+	soapErr  error
+	soapOne  sync.Once
+	tlsCert  *tls.Certificate
+	signer   *xmlsig.Signer
+	progress ProgressFunc
 	// now returns the date used for DataEmissao/Competencia. Injected so
 	// tests can pin a deterministic day.
 	now func() time.Time
 }
 
+// ProgressStatus describes the lifecycle state of one command step.
+type ProgressStatus string
+
+const (
+	ProgressStarted ProgressStatus = "started"
+	ProgressDone    ProgressStatus = "done"
+	ProgressSkipped ProgressStatus = "skipped"
+	ProgressFailed  ProgressStatus = "failed"
+)
+
+// ProgressEvent reports an operational step to the CLI. It intentionally
+// carries only user-facing metadata so service logic stays UI-agnostic.
+type ProgressEvent struct {
+	Step   string
+	Status ProgressStatus
+	Detail string
+}
+
+// ProgressFunc receives service progress events.
+type ProgressFunc func(ProgressEvent)
+
 // Options bundles the wiring inputs of New.
 type Options struct {
-	Config *config.Config
-	SOAP   soapCaller     // when nil, New builds a default *soap.Client from Config
-	Signer *xmlsig.Signer // when nil, New loads the A1 certificate from Config
-	Now    func() time.Time
+	Config   *config.Config
+	SOAP     soapCaller     // when nil, New builds a default *soap.Client from Config
+	Signer   *xmlsig.Signer // when nil, New loads the A1 certificate from Config
+	Now      func() time.Time
+	Progress ProgressFunc
 }
 
 // New builds a Service. When SOAP is nil, the SOAP client is built lazily on
@@ -56,7 +79,7 @@ func New(opts Options) (*Service, error) {
 	if opts.Config == nil {
 		return nil, fmt.Errorf("service: Config é obrigatório")
 	}
-	s := &Service{cfg: opts.Config, soap: opts.SOAP, signer: opts.Signer, now: opts.Now}
+	s := &Service{cfg: opts.Config, soap: opts.SOAP, signer: opts.Signer, now: opts.Now, progress: opts.Progress}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -112,6 +135,13 @@ func (s *Service) ensureSOAP() error {
 
 // Config returns the underlying configuration.
 func (s *Service) Config() *config.Config { return s.cfg }
+
+func (s *Service) report(step string, status ProgressStatus, detail string) {
+	if s.progress == nil {
+		return
+	}
+	s.progress(ProgressEvent{Step: step, Status: status, Detail: detail})
+}
 
 // MessagesError carries one or more MensagemRetorno entries surfaced by the
 // WS. Callers can type-assert it to distinguish business-rule rejections from

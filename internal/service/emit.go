@@ -27,24 +27,37 @@ func (s *Service) Emit(ctx context.Context, in *nota.Input) (*EmitResult, error)
 		return nil, fmt.Errorf("input inválido: %s", joinErrors(errs))
 	}
 
+	s.report("xml", ProgressStarted, "montando RPS")
 	inf := abrasf.BuildRPS(s.cfg, in, s.now())
 	unsigned, err := abrasf.BuildGerarNfse(inf)
 	if err != nil {
+		s.report("xml", ProgressFailed, err.Error())
 		return nil, err
 	}
+	s.report("xml", ProgressDone, fmt.Sprintf("RPS %d", inf.Rps.IdentificacaoRps.Numero))
+
 	signed := unsigned
 	if s.signer != nil {
+		s.report("assinatura", ProgressStarted, "assinando XML")
 		signed, err = s.signer.SignSibling(unsigned, "InfDeclaracaoPrestacaoServico", inf.ID)
 		if err != nil {
+			s.report("assinatura", ProgressFailed, err.Error())
 			return nil, fmt.Errorf("emit: assinatura: %w", err)
 		}
+		s.report("assinatura", ProgressDone, "XML assinado")
+	} else {
+		s.report("assinatura", ProgressSkipped, "sem certificado configurado")
 	}
 
+	s.report("prefeitura", ProgressStarted, "preparando SOAP")
 	if err := s.ensureSOAP(); err != nil {
+		s.report("prefeitura", ProgressFailed, err.Error())
 		return nil, err
 	}
+	s.report("prefeitura", ProgressStarted, "enviando RPS")
 	resp, err := s.soap.Call(ctx, "GerarNfse", signed)
 	if err != nil {
+		s.report("prefeitura", ProgressFailed, err.Error())
 		return &EmitResult{
 			NumeroRPS:   inf.Rps.IdentificacaoRps.Numero,
 			UnsignedXML: unsigned,
@@ -53,14 +66,18 @@ func (s *Service) Emit(ctx context.Context, in *nota.Input) (*EmitResult, error)
 		}, fmt.Errorf("emit: %w", err)
 	}
 
+	s.report("prefeitura", ProgressStarted, "lendo resposta")
 	bodyInner, err := soapExtract(resp)
 	if err != nil {
+		s.report("prefeitura", ProgressFailed, err.Error())
 		return nil, fmt.Errorf("emit: parse do envelope SOAP: %w", err)
 	}
 	payload, err := abrasf.ParseResponse(bodyInner)
 	if err != nil {
+		s.report("prefeitura", ProgressFailed, err.Error())
 		return nil, fmt.Errorf("emit: parse da resposta: %w", err)
 	}
+	s.report("prefeitura", ProgressDone, "resposta recebida")
 
 	result := &EmitResult{
 		NumeroRPS:   inf.Rps.IdentificacaoRps.Numero,
@@ -71,6 +88,7 @@ func (s *Service) Emit(ctx context.Context, in *nota.Input) (*EmitResult, error)
 	}
 
 	if payload.HasErrors() {
+		s.report("prefeitura", ProgressFailed, "rejeitada pelo webservice")
 		return result, &MessagesError{Action: "emit", Mensagens: payload.Mensagens, Raw: payload.Raw}
 	}
 
@@ -85,17 +103,26 @@ func (s *Service) EmitDryRun(in *nota.Input) (*EmitResult, error) {
 	if errs := nota.Validate(in); len(errs) > 0 {
 		return nil, fmt.Errorf("input inválido: %s", joinErrors(errs))
 	}
+	s.report("xml", ProgressStarted, "montando RPS")
 	inf := abrasf.BuildRPS(s.cfg, in, s.now())
 	unsigned, err := abrasf.BuildGerarNfse(inf)
 	if err != nil {
+		s.report("xml", ProgressFailed, err.Error())
 		return nil, err
 	}
+	s.report("xml", ProgressDone, fmt.Sprintf("RPS %d", inf.Rps.IdentificacaoRps.Numero))
+
 	signed := unsigned
 	if s.signer != nil {
+		s.report("assinatura", ProgressStarted, "assinando XML")
 		signed, err = s.signer.SignSibling(unsigned, "InfDeclaracaoPrestacaoServico", inf.ID)
 		if err != nil {
+			s.report("assinatura", ProgressFailed, err.Error())
 			return nil, fmt.Errorf("emit: assinatura: %w", err)
 		}
+		s.report("assinatura", ProgressDone, "XML assinado")
+	} else {
+		s.report("assinatura", ProgressSkipped, "sem certificado configurado")
 	}
 	return &EmitResult{
 		NumeroRPS:   inf.Rps.IdentificacaoRps.Numero,

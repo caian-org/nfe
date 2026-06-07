@@ -79,6 +79,7 @@ NFS-e via webservice ABRASF v2.04.
 
 ` + "```" + `
 nfe emit example                    # emite notas/example.toml
+nfe emit example --no-confirmation-wait
 nfe query --numero 123              # consulta por número
 nfe query --data-inicial 2025-01-01 --data-final 2025-01-31
 nfe cancel --numero 123 --codigo 1  # cancela a nota
@@ -87,4 +88,6 @@ nfe env producao                    # alterna ambiente
 ` + "```" + `
 
 Edite ` + "`config.toml`" + ` com os dados da sua empresa e credenciais antes de emitir.
+O ` + "`emit`" + ` aguarda confirmação por RPS usando ` + "`confirm_timeout`" + ` e ` + "`confirm_interval`" + ` em ` + "`[configuracoes]`" + `.
+Durante a emissão, o progresso aparece no terminal; com ` + "`--json`" + `, a saída permanece apenas JSON.
 `

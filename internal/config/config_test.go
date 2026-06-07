@@ -29,6 +29,10 @@ func TestLoadFull(t *testing.T) {
 	assert.Equal(t, "11222333000181", cfg.Prestador.CNPJ)
 	assert.Equal(t, "bob", cfg.Autenticacao.Usuario)
 	assert.Equal(t, "hunter2", cfg.Autenticacao.Senha)
+	timeout, interval, err := cfg.Configuracoes.ConfirmDurations()
+	require.NoError(t, err)
+	assert.Equal(t, "2m0s", timeout.String())
+	assert.Equal(t, "5s", interval.String())
 	require.NotNil(t, cfg.Autenticacao.Certificado)
 	assert.Equal(t, "/tmp/certs/empresa.pfx", cfg.Autenticacao.Certificado.Path)
 }
@@ -143,6 +147,45 @@ func TestLoadEnvVarKeptWhenUnset(t *testing.T) {
 	assert.Equal(t, "${NFE_SENHA}", cfg.Autenticacao.Senha)
 }
 
+func TestLoadAppliesConfirmationDefaults(t *testing.T) {
+	body := `ambiente = "homologacao"
+
+[soap]
+wsdl_homologacao = "https://teste.exemplo.com.br/abrasf/ws/nfs?wsdl"
+wsdl_producao = "https://producao.exemplo.com.br/abrasf/ws/nfs?wsdl"
+
+[prestador]
+cnpj = "11222333000181"
+inscricao_municipal = "123456"
+razao_social = "EXEMPLO LTDA"
+
+[prestador.endereco]
+endereco = "RUA EXEMPLO"
+numero = "100"
+bairro = "CENTRO"
+codigo_municipio = "1234567"
+uf = "SP"
+cep = "01234000"
+
+[autenticacao]
+usuario = "alice"
+senha = "s3cret"
+
+[configuracoes]
+serie_rps = "A"
+proximo_numero_rps = 1
+codigo_municipio = "1234567"
+aliquota_iss = 5.0
+`
+	path := filepath.Join(t.TempDir(), "config.toml")
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+
+	cfg, err := config.Load(path)
+	require.NoError(t, err)
+	assert.Equal(t, config.DefaultConfirmTimeout, cfg.Configuracoes.ConfirmTimeout)
+	assert.Equal(t, config.DefaultConfirmInterval, cfg.Configuracoes.ConfirmInterval)
+}
+
 func TestSaveRoundTrip(t *testing.T) {
 	t.Setenv("NFE_USUARIO", "x")
 	t.Setenv("NFE_SENHA", "x")
@@ -215,6 +258,16 @@ func TestValidate(t *testing.T) {
 			name: "missing wsdl homologacao",
 			fix:  func(c *config.Config) { c.SOAP.WSDLHomologacao = "" },
 			want: "soap.wsdl_homologacao",
+		},
+		{
+			name: "invalid confirm timeout",
+			fix:  func(c *config.Config) { c.Configuracoes.ConfirmTimeout = "nada" },
+			want: "configuracoes.confirm_timeout",
+		},
+		{
+			name: "zero confirm interval",
+			fix:  func(c *config.Config) { c.Configuracoes.ConfirmInterval = "0s" },
+			want: "configuracoes.confirm_interval",
 		},
 	}
 

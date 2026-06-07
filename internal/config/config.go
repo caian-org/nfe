@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -79,7 +80,14 @@ type Configuracoes struct {
 	ProximoNumeroRPS int     `toml:"proximo_numero_rps"`
 	CodigoMunicipio  string  `toml:"codigo_municipio"`
 	AliquotaISS      float64 `toml:"aliquota_iss"`
+	ConfirmTimeout   string  `toml:"confirm_timeout,omitempty"`
+	ConfirmInterval  string  `toml:"confirm_interval,omitempty"`
 }
+
+const (
+	DefaultConfirmTimeout  = "2m"
+	DefaultConfirmInterval = "5s"
+)
 
 // WSDLURL returns the WSDL endpoint for the configured ambiente.
 func (c *Config) WSDLURL() string {
@@ -118,12 +126,47 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("resolver caminho da configuração: %w", err)
 	}
 	cfg.configDir = filepath.Dir(absPath)
+	applyDefaults(&cfg)
 
 	if errs := Validate(&cfg); len(errs) > 0 {
 		return nil, fmt.Errorf("configuração inválida: %s", strings.Join(errs, "; "))
 	}
 
 	return &cfg, nil
+}
+
+func applyDefaults(cfg *Config) {
+	if cfg.Configuracoes.ConfirmTimeout == "" {
+		cfg.Configuracoes.ConfirmTimeout = DefaultConfirmTimeout
+	}
+	if cfg.Configuracoes.ConfirmInterval == "" {
+		cfg.Configuracoes.ConfirmInterval = DefaultConfirmInterval
+	}
+}
+
+// ConfirmDurations returns the polling timeout and interval used after an
+// asynchronous emission response.
+func (c Configuracoes) ConfirmDurations() (timeout, interval time.Duration, err error) {
+	timeout, err = parsePositiveDuration(c.ConfirmTimeout, "configuracoes.confirm_timeout")
+	if err != nil {
+		return 0, 0, err
+	}
+	interval, err = parsePositiveDuration(c.ConfirmInterval, "configuracoes.confirm_interval")
+	if err != nil {
+		return 0, 0, err
+	}
+	return timeout, interval, nil
+}
+
+func parsePositiveDuration(value, name string) (time.Duration, error) {
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, fmt.Errorf("%s deve ser uma duração válida (ex.: 30s, 2m)", name)
+	}
+	if d <= 0 {
+		return 0, fmt.Errorf("%s deve ser maior que zero", name)
+	}
+	return d, nil
 }
 
 // CertificatePath returns the absolute path of the A1 certificate,
@@ -220,6 +263,9 @@ func Validate(cfg *Config) []string {
 	}
 	if cfg.SOAP.WSDLProducao == "" {
 		errs = append(errs, "soap.wsdl_producao é obrigatório")
+	}
+	if _, _, err := cfg.Configuracoes.ConfirmDurations(); err != nil {
+		errs = append(errs, err.Error())
 	}
 
 	return errs
