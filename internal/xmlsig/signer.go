@@ -44,7 +44,7 @@ func NewSigner(cert *x509.Certificate, key *rsa.PrivateKey) (*Signer, error) {
 
 // Sign produces an enveloped signature over the element matching targetName
 // and (optionally) targetID. The Signature is appended as the last child of
-// that element's parent, matching the original xml-crypto implementation.
+// that element.
 //
 // The returned bytes are the new full document.
 func (s *Signer) Sign(xmlBytes []byte, targetName, targetID string) ([]byte, error) {
@@ -88,6 +88,45 @@ func (s *Signer) Sign(xmlBytes []byte, targetName, targetID string) ([]byte, err
 	idx := target.Index()
 	parent.RemoveChild(target)
 	parent.InsertChildAt(idx, signedTarget)
+
+	return doc.WriteToBytes()
+}
+
+// SignSibling signs the target element, then moves the resulting Signature to
+// be the target's next sibling. Some ABRASF schemas model Signature on the
+// enclosing declaration container while still referencing the signed Inf* Id.
+func (s *Signer) SignSibling(xmlBytes []byte, targetName, targetID string) ([]byte, error) {
+	signed, err := s.Sign(xmlBytes, targetName, targetID)
+	if err != nil {
+		return nil, err
+	}
+
+	doc := etree.NewDocument()
+	if err := doc.ReadFromBytes(signed); err != nil {
+		return nil, fmt.Errorf("xmlsig: parse assinado: %w", err)
+	}
+	root := doc.Root()
+	if root == nil {
+		return nil, errors.New("xmlsig: documento assinado vazio")
+	}
+	target := findElement(root, targetName, targetID)
+	if target == nil {
+		if targetID != "" {
+			return nil, fmt.Errorf("xmlsig: elemento assinado %s[@Id=%q] não encontrado", targetName, targetID)
+		}
+		return nil, fmt.Errorf("xmlsig: elemento assinado %s não encontrado", targetName)
+	}
+	parent := target.Parent()
+	if parent == nil || parent.Tag == "" {
+		return nil, errors.New("xmlsig: elemento assinado não tem pai para receber a assinatura")
+	}
+	sig := target.SelectElement("Signature")
+	if sig == nil {
+		return nil, errors.New("xmlsig: assinatura gerada não encontrada")
+	}
+
+	target.RemoveChild(sig)
+	parent.InsertChildAt(target.Index()+1, sig)
 
 	return doc.WriteToBytes()
 }

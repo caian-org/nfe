@@ -42,12 +42,14 @@ override unless ABRASF itself changes.
 Signed targets:
 
 - For `GerarNfse`: target is `InfDeclaracaoPrestacaoServico`, with `Id`
-  set on the struct. The signature ends up as the last child of the
-  `InfDeclaracaoPrestacaoServico` element; its enclosing `<Rps>`
-  container is untouched.
+  set on the struct. The digest/reference still covers that element, but
+  the `<Signature>` block is moved to be the next child of the enclosing
+  `<Rps>` container. Franco da Rocha's 2025 ABRASF schema models
+  `Signature` at the declaration container level, not inside `Inf...`.
 - For `CancelarNfse`: target is `InfPedidoCancelamento`. The `Id`
   attribute is `omitempty` in the Go struct but the canonical
-  cancellation flow sets it.
+  cancellation flow sets it. The signature remains a child of
+  `InfPedidoCancelamento` unless the cancellation schema proves otherwise.
 
 `ConsultarNfse` is not signed.
 
