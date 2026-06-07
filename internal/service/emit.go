@@ -34,7 +34,7 @@ func (s *Service) Emit(ctx context.Context, in *nota.Input) (*EmitResult, error)
 	}
 	signed := unsigned
 	if s.signer != nil {
-		signed, err = s.signer.Sign(unsigned, "InfDeclaracaoPrestacaoServico", inf.ID)
+		signed, err = s.signer.SignSibling(unsigned, "InfDeclaracaoPrestacaoServico", inf.ID)
 		if err != nil {
 			return nil, fmt.Errorf("emit: assinatura: %w", err)
 		}
@@ -92,7 +92,7 @@ func (s *Service) EmitDryRun(in *nota.Input) (*EmitResult, error) {
 	}
 	signed := unsigned
 	if s.signer != nil {
-		signed, err = s.signer.Sign(unsigned, "InfDeclaracaoPrestacaoServico", inf.ID)
+		signed, err = s.signer.SignSibling(unsigned, "InfDeclaracaoPrestacaoServico", inf.ID)
 		if err != nil {
 			return nil, fmt.Errorf("emit: assinatura: %w", err)
 		}

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/beevik/etree"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -159,6 +160,20 @@ func TestEmitSignsWhenSignerProvided(t *testing.T) {
 	_, err := svc.Emit(context.Background(), fixtureInput())
 	require.NoError(t, err)
 	assert.Contains(t, string(fake.lastBody), "<Signature", "signed XML must contain a Signature element")
+
+	doc := etree.NewDocument()
+	require.NoError(t, doc.ReadFromBytes(fake.lastBody))
+	infEl := doc.FindElement("//InfDeclaracaoPrestacaoServico")
+	require.NotNil(t, infEl)
+	assert.Nil(t, infEl.SelectElement("Signature"), "emit signature must not be nested inside InfDeclaracaoPrestacaoServico")
+	rpsEl := infEl.Parent()
+	require.NotNil(t, rpsEl)
+	sigEl := rpsEl.SelectElement("Signature")
+	require.NotNil(t, sigEl, "emit signature must be a child of the Rps container")
+	children := rpsEl.ChildElements()
+	require.Len(t, children, 2)
+	assert.Equal(t, infEl, children[0])
+	assert.Equal(t, sigEl, children[1])
 }
 
 func TestEmitDryRunDoesNotCallSoapOrBumpCounter(t *testing.T) {

@@ -31,8 +31,9 @@ envelopes:
 
 - `GerarNfseEnvio` — emission. Inner signed element is
   `InfDeclaracaoPrestacaoServico` (carries the `Id` attribute referenced
-  by the XMLDSig `Reference`). Container chain:
-  `GerarNfseEnvio → Rps (RpsContainer) → InfDeclaracaoPrestacaoServico`.
+  by the XMLDSig `Reference`). In the 2025 municipal schema used by
+  Franco da Rocha, the `<Signature>` block is emitted as a sibling after
+  that `Inf...` inside `GerarNfseEnvio → Rps`, not as a child of `Inf...`.
 - `ConsultarNfseServicoPrestadoEnvio` — read-only query. Same struct
   shape for both number-based and date-range lookups; `NumeroNfse` and
   `PeriodoCompetencia` are `omitempty`. `Pagina` is required.

@@ -66,7 +66,13 @@ func verifySignature(t *testing.T, infEl *etree.Element, cert *x509.Certificate)
 	require.NotNil(t, infEl)
 	sigEl := infEl.SelectElement("Signature")
 	require.NotNil(t, sigEl, "Inf must contain a Signature element")
+	verifySignatureWithElement(t, infEl, sigEl, cert, true)
+}
 
+func verifySignatureWithElement(t *testing.T, infEl, sigEl *etree.Element, cert *x509.Certificate, removeFromInf bool) {
+	t.Helper()
+	require.NotNil(t, infEl)
+	require.NotNil(t, sigEl)
 	signedInfo := sigEl.SelectElement("SignedInfo")
 	require.NotNil(t, signedInfo)
 
@@ -81,9 +87,11 @@ func verifySignature(t *testing.T, infEl *etree.Element, cert *x509.Certificate)
 	canonicalSI, err := c14n.Canonicalize(signedInfo)
 	require.NoError(t, err)
 
-	// Strip Signature in place — infEl stays attached so canonicalization
-	// preserves the inherited xmlns the signer used.
-	infEl.RemoveChild(sigEl)
+	if removeFromInf {
+		// Strip Signature in place — infEl stays attached so canonicalization
+		// preserves the inherited xmlns the signer used.
+		infEl.RemoveChild(sigEl)
+	}
 
 	canonical, err := c14n.Canonicalize(infEl)
 	require.NoError(t, err)
@@ -170,6 +178,61 @@ func TestSignGerarNfse(t *testing.T) {
 
 	// Verify the signature numerically.
 	verifySignature(t, infEl, cert)
+}
+
+func TestSignSiblingGerarNfse(t *testing.T) {
+	cert, key := makeTestCert(t)
+	signer, err := xmlsig.NewSigner(cert, key)
+	require.NoError(t, err)
+
+	cfg := config.Default()
+	cfg.Configuracoes.ProximoNumeroRPS = 7
+	inf := abrasf.BuildRPS(cfg, &nota.Input{
+		Tomador: nota.Tomador{
+			CNPJ:        "44555666000170",
+			RazaoSocial: "TOMADOR EXEMPLO",
+			Endereco: nota.Endereco{
+				Endereco:        "RUA EXEMPLO",
+				Numero:          "1",
+				Bairro:          "CENTRO",
+				CodigoMunicipio: "7654321",
+				UF:              "SP",
+				CEP:             "01000000",
+			},
+		},
+		Servico: nota.Servico{
+			Discriminacao:    "TEST",
+			ValorServicos:    100.0,
+			ItemListaServico: "0101",
+			Aliquota:         5.0,
+		},
+	}, time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC))
+	unsigned, err := abrasf.BuildGerarNfse(inf)
+	require.NoError(t, err)
+
+	signed, err := signer.SignSibling(unsigned, "InfDeclaracaoPrestacaoServico", "rps7")
+	require.NoError(t, err)
+
+	doc := etree.NewDocument()
+	require.NoError(t, doc.ReadFromBytes(signed))
+
+	infEl := doc.FindElement("//InfDeclaracaoPrestacaoServico[@Id='rps7']")
+	require.NotNil(t, infEl)
+	assert.Nil(t, infEl.SelectElement("Signature"), "Signature must not be a child of Inf")
+
+	rpsEl := infEl.Parent()
+	require.NotNil(t, rpsEl)
+	sigEl := rpsEl.SelectElement("Signature")
+	require.NotNil(t, sigEl, "Signature must be a child of the Rps container")
+	children := rpsEl.ChildElements()
+	require.Len(t, children, 2)
+	assert.Equal(t, infEl, children[0])
+	assert.Equal(t, sigEl, children[1])
+
+	ref := sigEl.FindElement(".//Reference")
+	require.NotNil(t, ref)
+	assert.Equal(t, "#rps7", ref.SelectAttrValue("URI", ""))
+	verifySignatureWithElement(t, infEl, sigEl, cert, false)
 }
 
 func TestSignCancelarNfse(t *testing.T) {
