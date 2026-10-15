@@ -17,12 +17,16 @@ Single Go module: `github.com/caian-org/nfe`. Binary entrypoint
   symbols injected by goreleaser ldflags.
 - `internal/config/` — TOML configuration loader, defaults, validation.
 - `internal/nota/` — TOML input schema for the emission flow.
+- `internal/dps/` — national-layout DPS builder + NFS-e parser (Franco da
+  Rocha, SIGCORP WS Padrão Nacional).
+- `internal/sigcorp/` — REST client for recepção/consulta of the DPS.
 - `internal/abrasf/` — ABRASF v2.04 builders, `Dec1`/`Dec2` types,
   response parsing, golden XML tests.
 - `internal/xmlsig/` — Enveloped XMLDSig signer + PKCS#12 A1 loader.
 - `internal/soap/` — SOAP 1.1 client + WSDL auto-discovery.
 - `internal/service/` — `build → sign → send → parse` orchestration used
-  by the CLI.
+  by the CLI; dispatches national (REST) vs ABRASF (SOAP) on
+  `cfg.IsNacional()`.
 - `internal/render/` — Human and JSON renderers.
 - `internal/validation/`, `internal/logging/` — small helpers.
 
@@ -50,8 +54,8 @@ CLI surface (see `internal/cli/`):
 - `nfe init [path]` — scaffold project layout (defaults to `~/.nfews`).
 - `nfe status` / `nfe env <homologacao|producao>` — read-only inspection
   and active-environment switch.
-- `nfe query --numero N` or `--data-inicial AAAA-MM-DD --data-final
-  AAAA-MM-DD` — NFS-e lookup.
+- `nfe query --protocolo P` (national) or `--numero N` /
+  `--data-inicial AAAA-MM-DD --data-final AAAA-MM-DD` (ABRASF) — NFS-e lookup.
 - `nfe emit input.toml [--dry-run]` — emit a new NFS-e.
 - `nfe cancel --numero N --codigo C` — cancel an authorized NFS-e.
 
@@ -66,8 +70,9 @@ Smallest useful check first.
 - Before opening a PR: `just test-race` plus `just lint` (CI runs the
   same plus golangci-lint).
 - After touching XML builders: `go test ./internal/abrasf/... -update`
-  to regenerate goldens, then read the diff carefully, then
-  `just test-race` again.
+  or `go test ./internal/dps/... -update` to regenerate goldens, then read
+  the diff carefully, then `just test-race` again.
+- After touching the REST client: `go test ./internal/sigcorp/...`.
 - After touching SOAP/WSDL discovery: `go test ./internal/soap/...`.
 - After touching the signer: `go test ./internal/xmlsig/...`.
 
@@ -77,8 +82,9 @@ Smallest useful check first.
 - Error wrapping: prefix in English (`pkg:`), body in pt-BR.
 - Code comments and package doc strings in English. User-facing strings
   (CLI help, error message bodies, render labels, README) in pt-BR.
-- Never reorder fields in `internal/abrasf/types.go` without regenerating
-  goldens — field order maps directly to XML element order.
+- Never reorder fields in `internal/abrasf/types.go` or
+  `internal/dps/types.go` without regenerating goldens — field order maps
+  directly to XML element order.
 
 ## The `ws/` rule
 

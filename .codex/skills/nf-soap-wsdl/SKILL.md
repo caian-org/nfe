@@ -5,7 +5,9 @@ description: SOAP 1.1 transport and WSDL auto-discovery for nf. Use when changin
 
 # Nf SOAP + WSDL
 
-Use this skill before touching `internal/soap/`.
+Use this skill before touching `internal/soap/`. This transport serves
+ABRASF municipalities (config without `[nacional]`); the SIGCORP REST
+transport lives in `internal/sigcorp` (`nf-dps-nacional`).
 
 ## Envelope shape
 
@@ -85,6 +87,12 @@ returns the inner XML inside `<soap:Body>`. Downstream parsing in
 SOAP faults are surfaced with the body intact and an error of the form
 `soap: servidor retornou HTTP NNN`. Callers (in `internal/service/`)
 inspect the body when faults arrive to extract `<Fault>` detail.
+
+DNS failures, refused connections and gateway statuses (502/503/504) from
+either the WSDL fetch or a call are wrapped in `*soap.UnavailableError`
+(`internal/soap/unavailable.go`), whose message says the municipal
+webservice is unreachable and points at the integration page. HTTP 500
+stays a plain error because that is how PHP `SoapServer` delivers faults.
 
 ## Lazy client construction
 
