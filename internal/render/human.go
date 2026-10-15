@@ -34,7 +34,12 @@ func (r *humanRenderer) Status(s StatusInfo) error {
 	r.headline("status do nfe")
 	r.section("workspace")
 	r.row("ambiente", s.Ambiente)
-	r.row("wsdl", s.WSDLURL)
+	r.row("SOAP", s.SOAPMode)
+	if s.EndpointURL != "" {
+		r.row("endpoint", s.EndpointURL)
+	} else {
+		r.row("wsdl", s.WSDLURL)
+	}
 	r.section("prestador")
 	r.row("razão social", s.RazaoSocial)
 	r.row("CNPJ", s.CNPJ)

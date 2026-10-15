@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -22,6 +23,7 @@ type emitProgress struct {
 	done        chan error
 	interactive bool
 	disabled    bool
+	closeOnce   sync.Once
 }
 
 type emitProgressUpdate struct {
@@ -83,18 +85,20 @@ func (p *emitProgress) Report(step string, status service.ProgressStatus, detail
 }
 
 func (p *emitProgress) Close() {
-	if p.disabled {
-		return
-	}
-	if p.interactive {
-		close(p.updates)
-		select {
-		case <-p.done:
-		case <-time.After(2 * time.Second):
+	p.closeOnce.Do(func() {
+		if p.disabled {
+			return
 		}
-		return
-	}
-	fmt.Fprintln(p.w)
+		if p.interactive {
+			close(p.updates)
+			select {
+			case <-p.done:
+			case <-time.After(2 * time.Second):
+			}
+			return
+		}
+		fmt.Fprintln(p.w)
+	})
 }
 
 func plainProgressGlyph(status service.ProgressStatus) string {

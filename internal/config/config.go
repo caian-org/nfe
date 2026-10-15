@@ -33,11 +33,16 @@ type Config struct {
 	configDir string
 }
 
-// SOAP holds the WSDL endpoints used for each environment. Making them
+// SOAP holds the transport endpoints used for each environment. Making them
 // configurable lets the same binary serve any ABRASF municipality.
 type SOAP struct {
-	WSDLHomologacao string `toml:"wsdl_homologacao"`
-	WSDLProducao    string `toml:"wsdl_producao"`
+	WSDLHomologacao      string `toml:"wsdl_homologacao,omitempty"`
+	WSDLProducao         string `toml:"wsdl_producao,omitempty"`
+	EndpointHomologacao  string `toml:"endpoint_homologacao,omitempty"`
+	EndpointProducao     string `toml:"endpoint_producao,omitempty"`
+	NamespaceHomologacao string `toml:"namespace_homologacao,omitempty"`
+	NamespaceProducao    string `toml:"namespace_producao,omitempty"`
+	SOAPActionPrefix     string `toml:"soap_action_prefix,omitempty"`
 }
 
 type Prestador struct {
@@ -85,8 +90,9 @@ type Configuracoes struct {
 }
 
 const (
-	DefaultConfirmTimeout  = "2m"
-	DefaultConfirmInterval = "5s"
+	DefaultConfirmTimeout   = "2m"
+	DefaultConfirmInterval  = "5s"
+	DefaultSOAPActionPrefix = "nfs#"
 )
 
 // WSDLURL returns the WSDL endpoint for the configured ambiente.
@@ -95,6 +101,39 @@ func (c *Config) WSDLURL() string {
 		return c.SOAP.WSDLProducao
 	}
 	return c.SOAP.WSDLHomologacao
+}
+
+// EndpointURL returns the explicit SOAP endpoint for the configured ambiente,
+// or an empty string when the client should discover it from the WSDL.
+func (c *Config) EndpointURL() string {
+	if c.Ambiente == EnvProducao {
+		return c.SOAP.EndpointProducao
+	}
+	return c.SOAP.EndpointHomologacao
+}
+
+// MethodNamespace returns the explicit method namespace for the configured
+// ambiente, or the endpoint URL as the ABRASF direct-endpoint fallback.
+func (c *Config) MethodNamespace() string {
+	if c.Ambiente == EnvProducao {
+		if c.SOAP.NamespaceProducao != "" {
+			return c.SOAP.NamespaceProducao
+		}
+		return c.SOAP.EndpointProducao
+	}
+	if c.SOAP.NamespaceHomologacao != "" {
+		return c.SOAP.NamespaceHomologacao
+	}
+	return c.SOAP.EndpointHomologacao
+}
+
+// SOAPActionPrefix returns the configured SOAPAction prefix. ABRASF WSDLs
+// usually declare values such as "nfs#GerarNfse".
+func (c *Config) SOAPActionPrefix() string {
+	if c.SOAP.SOAPActionPrefix == "" {
+		return DefaultSOAPActionPrefix
+	}
+	return c.SOAP.SOAPActionPrefix
 }
 
 // IsProducao reports whether the configuration targets the production
@@ -136,6 +175,9 @@ func Load(path string) (*Config, error) {
 }
 
 func applyDefaults(cfg *Config) {
+	if cfg.SOAP.SOAPActionPrefix == "" {
+		cfg.SOAP.SOAPActionPrefix = DefaultSOAPActionPrefix
+	}
 	if cfg.Configuracoes.ConfirmTimeout == "" {
 		cfg.Configuracoes.ConfirmTimeout = DefaultConfirmTimeout
 	}
@@ -258,11 +300,11 @@ func Validate(cfg *Config) []string {
 	if cfg.Configuracoes.CodigoMunicipio == "" {
 		errs = append(errs, "código do município é obrigatório")
 	}
-	if cfg.SOAP.WSDLHomologacao == "" {
-		errs = append(errs, "soap.wsdl_homologacao é obrigatório")
+	if cfg.SOAP.WSDLHomologacao == "" && cfg.SOAP.EndpointHomologacao == "" {
+		errs = append(errs, "soap.wsdl_homologacao ou soap.endpoint_homologacao é obrigatório")
 	}
-	if cfg.SOAP.WSDLProducao == "" {
-		errs = append(errs, "soap.wsdl_producao é obrigatório")
+	if cfg.SOAP.WSDLProducao == "" && cfg.SOAP.EndpointProducao == "" {
+		errs = append(errs, "soap.wsdl_producao ou soap.endpoint_producao é obrigatório")
 	}
 	if _, _, err := cfg.Configuracoes.ConfirmDurations(); err != nil {
 		errs = append(errs, err.Error())

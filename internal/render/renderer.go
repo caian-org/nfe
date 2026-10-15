@@ -11,7 +11,9 @@ import (
 // StatusInfo summarises the active configuration for the `status` command.
 type StatusInfo struct {
 	Ambiente           string  `json:"ambiente"`
+	SOAPMode           string  `json:"soap_mode"`
 	WSDLURL            string  `json:"wsdl_url"`
+	EndpointURL        string  `json:"endpoint_url,omitempty"`
 	RazaoSocial        string  `json:"razao_social"`
 	CNPJ               string  `json:"cnpj"`
 	InscricaoMunicipal string  `json:"inscricao_municipal"`
@@ -28,10 +30,16 @@ func NewStatusInfo(cfg *config.Config) StatusInfo {
 	hasUser := cfg.Autenticacao.Usuario != "" && cfg.Autenticacao.Senha != ""
 	hasCert := cfg.Autenticacao.Certificado != nil &&
 		cfg.Autenticacao.Certificado.Path != ""
+	soapMode := "wsdl"
+	if cfg.EndpointURL() != "" {
+		soapMode = "endpoint"
+	}
 
 	return StatusInfo{
 		Ambiente:           cfg.Ambiente,
+		SOAPMode:           soapMode,
 		WSDLURL:            cfg.WSDLURL(),
+		EndpointURL:        cfg.EndpointURL(),
 		RazaoSocial:        cfg.Prestador.RazaoSocial,
 		CNPJ:               cfg.Prestador.CNPJ,
 		InscricaoMunicipal: cfg.Prestador.InscricaoMunicipal,

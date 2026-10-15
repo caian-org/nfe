@@ -321,6 +321,24 @@ func TestQueryByNumeroRendersTable(t *testing.T) {
 	assert.Contains(t, out, "ACME")
 }
 
+func TestQueryUsesConfiguredEndpointWhenWSDLIsUnavailable(t *testing.T) {
+	srv := fakeABRASF(t, soapEnvelope(`<ConsultarNfseResposta><ListaNfse><CompNfse><Nfse><InfNfse><Numero>42</Numero><CodigoVerificacao>ABC</CodigoVerificacao><DataEmissao>2026-05-01T10:00:00-03:00</DataEmissao></InfNfse></Nfse></CompNfse></ListaNfse></ConsultarNfseResposta>`))
+	defer srv.Close()
+
+	cfg := config.Default()
+	cfg.Autenticacao.Usuario = "u"
+	cfg.Autenticacao.Senha = "p"
+	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1/unavailable?wsdl"
+	cfg.SOAP.EndpointHomologacao = srv.URL + "/svc"
+	workspace := t.TempDir()
+	require.NoError(t, config.Save(filepath.Join(workspace, "config.toml"), cfg))
+
+	out, err := runCmd(t, "-w", workspace, "query", "-n", "42")
+	require.NoError(t, err)
+	assert.Contains(t, out, "42")
+	assert.Contains(t, out, "ABC")
+}
+
 func TestQueryParsesProviderLinkAliases(t *testing.T) {
 	cases := []struct {
 		name string

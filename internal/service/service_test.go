@@ -7,8 +7,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"io"
 	"math/big"
 	mathrand "math/rand"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -222,6 +226,41 @@ func TestQueryByRPS(t *testing.T) {
 	assert.Contains(t, string(fake.lastBody), "<Numero>7</Numero>")
 }
 
+func TestQueryUsesDirectEndpointWithoutFetchingWSDL(t *testing.T) {
+	var gotAction string
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			t.Fatalf("WSDL must not be fetched when endpoint is configured")
+		}
+		gotAction = r.Header.Get("SOAPAction")
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		w.Write(wrapSOAPResponse(`<ConsultarNfseResposta><ListaNfse><CompNfse><Nfse><InfNfse><Numero>1</Numero></InfNfse></Nfse></CompNfse></ListaNfse></ConsultarNfseResposta>`))
+	}))
+	defer srv.Close()
+
+	cfg := config.Default()
+	cfg.Autenticacao.Usuario = "u"
+	cfg.Autenticacao.Senha = "p"
+	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1/unavailable?wsdl"
+	cfg.SOAP.EndpointHomologacao = srv.URL
+	cfg.SOAP.NamespaceHomologacao = "urn:test"
+	cfg.SOAP.SOAPActionPrefix = "custom#"
+
+	svc, err := service.New(service.Options{Config: cfg})
+	require.NoError(t, err)
+
+	res, err := svc.Query(context.Background(), abrasf.ConsultaQuery{Numero: "42"})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, `"custom#ConsultarNfseServicoPrestado"`, gotAction)
+	assert.Contains(t, gotBody, `xmlns:tns="urn:test"`)
+	assert.Contains(t, gotBody, "<tns:ConsultarNfseServicoPrestadoRequest>")
+	assert.NotContains(t, strings.ToLower(gotBody), "wsdl")
+}
+
 func TestQuerySurfacesErrors(t *testing.T) {
 	svc, fake := fixtureService(t, false)
 	fake.response = wrapSOAPResponse(`<r><MensagemRetorno><Codigo>E1</Codigo><Mensagem>m</Mensagem></MensagemRetorno></r>`)
@@ -230,6 +269,22 @@ func TestQuerySurfacesErrors(t *testing.T) {
 	var me *service.MessagesError
 	require.ErrorAs(t, err, &me)
 	assert.Equal(t, "query", me.Action)
+}
+
+func TestQueryHTTPErrorSurfacesSOAPFault(t *testing.T) {
+	svc, fake := fixtureService(t, false)
+	fake.err = errors.New("soap: servidor retornou HTTP 500")
+	fake.response = []byte(`<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultstring>Falha interna do provedor</faultstring></soap:Fault></soap:Body></soap:Envelope>`)
+
+	res, err := svc.Query(context.Background(), abrasf.ConsultaQuery{Numero: "1"})
+	require.Error(t, err)
+	require.NotNil(t, res)
+	var me *service.MessagesError
+	require.ErrorAs(t, err, &me)
+	assert.Equal(t, "query", me.Action)
+	require.Len(t, res.Mensagens, 1)
+	assert.Equal(t, "SOAP", res.Mensagens[0].Codigo)
+	assert.Equal(t, "Falha interna do provedor", res.Mensagens[0].Mensagem)
 }
 
 func TestQueryRequiresFilter(t *testing.T) {

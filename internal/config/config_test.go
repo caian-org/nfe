@@ -57,6 +57,29 @@ func TestProducaoSelection(t *testing.T) {
 	assert.NotContains(t, cfg.WSDLURL(), "teste")
 }
 
+func TestDirectEndpointSelection(t *testing.T) {
+	cfg := config.Default()
+	cfg.SOAP.EndpointHomologacao = "https://soap-homologacao.example.test/ws/nfs"
+	cfg.SOAP.EndpointProducao = "https://soap-producao.example.test/ws/nfs"
+	cfg.SOAP.NamespaceHomologacao = "urn:hml"
+	cfg.SOAP.NamespaceProducao = "urn:prd"
+
+	assert.Equal(t, "https://soap-homologacao.example.test/ws/nfs", cfg.EndpointURL())
+	assert.Equal(t, "urn:hml", cfg.MethodNamespace())
+	assert.Equal(t, config.DefaultSOAPActionPrefix, cfg.SOAPActionPrefix())
+
+	cfg.Ambiente = config.EnvProducao
+	assert.Equal(t, "https://soap-producao.example.test/ws/nfs", cfg.EndpointURL())
+	assert.Equal(t, "urn:prd", cfg.MethodNamespace())
+}
+
+func TestDirectEndpointFallsBackNamespaceToEndpoint(t *testing.T) {
+	cfg := config.Default()
+	cfg.SOAP.EndpointHomologacao = "https://soap.example.test/ws/nfs"
+
+	assert.Equal(t, cfg.SOAP.EndpointHomologacao, cfg.MethodNamespace())
+}
+
 func TestLoadMissing(t *testing.T) {
 	_, err := config.Load("/no/such/path.toml")
 	require.Error(t, err)
@@ -260,6 +283,14 @@ func TestValidate(t *testing.T) {
 			want: "soap.wsdl_homologacao",
 		},
 		{
+			name: "wsdl homologacao can be replaced by endpoint",
+			fix: func(c *config.Config) {
+				c.SOAP.WSDLHomologacao = ""
+				c.SOAP.EndpointHomologacao = "https://soap.example.test/ws/nfs"
+			},
+			want: "",
+		},
+		{
 			name: "invalid confirm timeout",
 			fix:  func(c *config.Config) { c.Configuracoes.ConfirmTimeout = "nada" },
 			want: "configuracoes.confirm_timeout",
@@ -276,6 +307,10 @@ func TestValidate(t *testing.T) {
 			cfg := config.Default()
 			tc.fix(cfg)
 			errs := config.Validate(cfg)
+			if tc.want == "" {
+				require.Empty(t, errs, "expected config to be valid")
+				return
+			}
 			require.NotEmpty(t, errs, "expected validation errors")
 			joined := ""
 			for _, e := range errs {

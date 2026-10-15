@@ -75,6 +75,7 @@ func newEmitCmd(gf *globalFlags) *cobra.Command {
 				progress.Report("prefeitura", service.ProgressSkipped, "dry-run")
 				progress.Report("confirmação", service.ProgressSkipped, "dry-run")
 				progress.Report("config", service.ProgressSkipped, "sem incremento")
+				progress.Close()
 				return gf.renderer(cmd).Emit(render.EmitInfo{
 					DryRun:    true,
 					Verbose:   verbose,
@@ -127,6 +128,7 @@ func newEmitCmd(gf *globalFlags) *cobra.Command {
 			default:
 				return err
 			}
+			progress.Close()
 			return gf.renderer(cmd).Emit(info)
 		},
 	}

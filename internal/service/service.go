@@ -113,9 +113,15 @@ func (s *Service) ensureSOAP() error {
 			return
 		}
 		soapOpts := soap.Options{
-			WSDLURL:            s.cfg.WSDLURL(),
 			InsecureSkipVerify: !s.cfg.IsProducao(),
 			TLSCert:            s.tlsCert,
+		}
+		if endpoint := s.cfg.EndpointURL(); endpoint != "" {
+			soapOpts.Endpoint = endpoint
+			soapOpts.MethodNamespace = s.cfg.MethodNamespace()
+			soapOpts.SoapActions = abrasfSOAPActions(s.cfg.SOAPActionPrefix())
+		} else {
+			soapOpts.WSDLURL = s.cfg.WSDLURL()
 		}
 		if s.cfg.Autenticacao.Usuario != "" && s.cfg.Autenticacao.Senha != "" {
 			soapOpts.BasicAuth = &soap.BasicAuth{
@@ -131,6 +137,20 @@ func (s *Service) ensureSOAP() error {
 		s.soap = client
 	})
 	return s.soapErr
+}
+
+func abrasfSOAPActions(prefix string) map[string]string {
+	ops := []string{
+		"GerarNfse",
+		"ConsultarNfseServicoPrestado",
+		"ConsultarNfsePorRps",
+		"CancelarNfse",
+	}
+	actions := make(map[string]string, len(ops))
+	for _, op := range ops {
+		actions[op] = prefix + op
+	}
+	return actions
 }
 
 // Config returns the underlying configuration.

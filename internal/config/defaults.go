@@ -7,8 +7,9 @@ func Default() *Config {
 	return &Config{
 		Ambiente: EnvHomologacao,
 		SOAP: SOAP{
-			WSDLHomologacao: "https://teste.exemplo.com.br/abrasf/ws/nfs?wsdl",
-			WSDLProducao:    "https://producao.exemplo.com.br/abrasf/ws/nfs?wsdl",
+			WSDLHomologacao:  "https://teste.exemplo.com.br/abrasf/ws/nfs?wsdl",
+			WSDLProducao:     "https://producao.exemplo.com.br/abrasf/ws/nfs?wsdl",
+			SOAPActionPrefix: DefaultSOAPActionPrefix,
 		},
 		Prestador: Prestador{
 			CNPJ:               "00000000000000",
