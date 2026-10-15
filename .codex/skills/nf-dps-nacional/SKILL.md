@@ -76,6 +76,8 @@ Read the golden diff; every byte change must map to an intentional rule.
 ## Known gaps (document, do not hide)
 
 - No cancel / query-by-number in the SIGCORP API.
+- `tribFed/piscofins` is fixed at `CST=00`, `tpRetPisCofins=0` (PIS/COFINS/CSLL
+  not withheld, no rates or base). Withholding is not configurable yet.
 - ME/EPP prestadores must not send `indTotTrib`; the builder always sends 0.
 - `IBSCBS/valores` in XSD v1.01 has no monetary fields; `[ibscbs]` rates are
   config documentation only.

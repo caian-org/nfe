@@ -24,8 +24,13 @@ const (
 	TpRetISSQNRetidoTomador = 2
 	TpRetISSQNRetidoInterm  = 3
 	IndTotTribNaoInformado  = 0
-	FinNFSeRegular          = 0
-	IndDestTomador          = 0
+
+	// CSTPisCofinsNenhum and TpRetPisCofinsNaoRetidos declare that the
+	// prestador neither computes nor has PIS/COFINS/CSLL withheld on the note.
+	CSTPisCofinsNenhum       = "00"
+	TpRetPisCofinsNaoRetidos = 0
+	FinNFSeRegular           = 0
+	IndDestTomador           = 0
 )
 
 // Dec2 renders TSDec15V2 / TSDec1V2 values with exactly two fractional digits.
@@ -147,6 +152,7 @@ type VServPrest struct {
 type Trib struct {
 	XMLName xml.Name `xml:"trib"`
 	TribMun TribMun  `xml:"tribMun"`
+	TribFed *TribFed `xml:"tribFed,omitempty"`
 	TotTrib TotTrib  `xml:"totTrib"`
 }
 
@@ -155,6 +161,19 @@ type TribMun struct {
 	TribISSQN  int      `xml:"tribISSQN"`
 	TpRetISSQN int      `xml:"tpRetISSQN"`
 	PAliq      *Dec2    `xml:"pAliq,omitempty"`
+}
+
+// TribFed carries the federal-tax group (TCTribFederal). Only PIS/COFINS is
+// modelled; the monetary and rate fields are deliberately absent.
+type TribFed struct {
+	XMLName   xml.Name  `xml:"tribFed"`
+	PisCofins PisCofins `xml:"piscofins"`
+}
+
+type PisCofins struct {
+	XMLName        xml.Name `xml:"piscofins"`
+	CST            string   `xml:"CST"`
+	TpRetPisCofins int      `xml:"tpRetPisCofins"`
 }
 
 type TotTrib struct {

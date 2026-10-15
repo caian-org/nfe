@@ -60,7 +60,9 @@ SIGCORP. O que o `nfe` envia (`internal/dps`):
   observações.
 - `valores`: `vServ`; `tribMun{tribISSQN=1, tpRetISSQN 1|2}`; `pAliq` apenas
   para Simples Nacional ou prestação fora do município (regra da plataforma,
-  faixa 2–5%); `totTrib/indTotTrib=0`.
+  faixa 2–5%); `tribFed/piscofins{CST=00, tpRetPisCofins=0}` declara que
+  PIS/COFINS/CSLL não são retidos e não informa alíquota nem base;
+  `totTrib/indTotTrib=0`.
 - `IBSCBS` só com `[ibscbs]` no config: `finNFSe=0`, `cIndOp`, `indDest=0`,
   `valores/trib/gIBSCBS{CST, cClassTrib}`. A plataforma não calcula IBS/CBS e
   exige `cNBS` junto. Prestadores do Simples não podem enviar o grupo.

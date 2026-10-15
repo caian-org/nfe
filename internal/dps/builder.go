@@ -103,6 +103,7 @@ func Build(cfg *config.Config, in *nota.Input, now time.Time) (*DPS, error) {
 				VServPrest: VServPrest{VServ: Dec2(in.Servico.ValorServicos)},
 				Trib: Trib{
 					TribMun: tribMun,
+					TribFed: &TribFed{PisCofins: PisCofins{CST: CSTPisCofinsNenhum, TpRetPisCofins: TpRetPisCofinsNaoRetidos}},
 					TotTrib: TotTrib{IndTotTrib: IndTotTribNaoInformado},
 				},
 			},

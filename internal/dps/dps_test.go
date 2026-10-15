@@ -194,6 +194,15 @@ func TestBuildPAliqRules(t *testing.T) {
 	assert.Contains(t, string(out), "<pAliq>3.50</pAliq>")
 }
 
+func TestBuildDeclaresFederalTaxesNotWithheld(t *testing.T) {
+	d, err := dps.Build(fixtureConfig(), fixtureInput(), fixtureDate())
+	require.NoError(t, err)
+	fed := d.InfDPS.Valores.Trib.TribFed
+	require.NotNil(t, fed, "tribFed is always present so the platform does not assume withholding")
+	assert.Equal(t, dps.CSTPisCofinsNenhum, fed.PisCofins.CST)
+	assert.Equal(t, dps.TpRetPisCofinsNaoRetidos, fed.PisCofins.TpRetPisCofins)
+}
+
 func TestBuildIssRetido(t *testing.T) {
 	in := fixtureInput()
 	in.Servico.IssRetido = true
