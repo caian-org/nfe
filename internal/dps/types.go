@@ -63,14 +63,19 @@ type InfDPS struct {
 	IBSCBS   *IBSCBS   `xml:"IBSCBS,omitempty"`
 }
 
-// Prestador identifies the emitter. Cadastral data (name, address) is kept
-// by the municipality, so only the identifiers and regime travel.
+// Prestador identifies the emitter. The ADN schema makes name and address
+// optional, but the SIGCORP platform rejects a DPS without them
+// (PRESTADOR_NOME_ENDERECO_OBRIGATORIOS).
 type Prestador struct {
-	XMLName xml.Name `xml:"prest"`
-	CNPJ    string   `xml:"CNPJ,omitempty"`
-	CPF     string   `xml:"CPF,omitempty"`
-	IM      string   `xml:"IM,omitempty"`
-	RegTrib RegTrib  `xml:"regTrib"`
+	XMLName xml.Name  `xml:"prest"`
+	CNPJ    string    `xml:"CNPJ,omitempty"`
+	CPF     string    `xml:"CPF,omitempty"`
+	IM      string    `xml:"IM,omitempty"`
+	XNome   string    `xml:"xNome,omitempty"`
+	End     *Endereco `xml:"end,omitempty"`
+	Fone    string    `xml:"fone,omitempty"`
+	Email   string    `xml:"email,omitempty"`
+	RegTrib RegTrib   `xml:"regTrib"`
 }
 
 type RegTrib struct {

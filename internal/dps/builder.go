@@ -36,6 +36,10 @@ func Build(cfg *config.Config, in *nota.Input, now time.Time) (*DPS, error) {
 	if err != nil {
 		errs = append(errs, err.Error())
 	}
+	prest, err := buildPrestador(cfg)
+	if err != nil {
+		errs = append(errs, err.Error())
+	}
 	if len(errs) > 0 {
 		return nil, fmt.Errorf("dps: %s", strings.Join(errs, "; "))
 	}
@@ -92,16 +96,9 @@ func Build(cfg *config.Config, in *nota.Input, now time.Time) (*DPS, error) {
 			DCompet:  now.Format("2006-01-02"),
 			TpEmit:   TpEmitPrestador,
 			CLocEmi:  cLocEmi,
-			Prest: Prestador{
-				CNPJ: digits(cfg.Prestador.CNPJ),
-				IM:   cfg.Prestador.InscricaoMunicipal,
-				RegTrib: RegTrib{
-					OpSimpNac:  cfg.Nacional.OpSimpNac,
-					RegEspTrib: cfg.Nacional.RegEspTrib,
-				},
-			},
-			Toma: toma,
-			Serv: serv,
+			Prest:    prest,
+			Toma:     toma,
+			Serv:     serv,
 			Valores: Valores{
 				VServPrest: VServPrest{VServ: Dec2(in.Servico.ValorServicos)},
 				Trib: Trib{
@@ -148,6 +145,32 @@ func leftPad(s string, n int) string {
 		return s
 	}
 	return strings.Repeat("0", n-len(s)) + s
+}
+
+func buildPrestador(cfg *config.Config) (Prestador, error) {
+	pr := cfg.Prestador
+	e := pr.Endereco
+	if pr.RazaoSocial == "" || e.CodigoMunicipio == "" || e.CEP == "" || e.Endereco == "" || e.Numero == "" || e.Bairro == "" {
+		return Prestador{}, errors.New("prestador.razao_social e prestador.endereco (codigo_municipio, cep, endereco, numero, bairro) são obrigatórios: a plataforma rejeita a DPS sem nome e endereço do prestador")
+	}
+	p := Prestador{
+		CNPJ:  digits(pr.CNPJ),
+		IM:    pr.InscricaoMunicipal,
+		XNome: pr.RazaoSocial,
+		End: &Endereco{
+			EndNac:  EnderecoNac{CMun: e.CodigoMunicipio, CEP: digits(e.CEP)},
+			XLgr:    e.Endereco,
+			Nro:     e.Numero,
+			XCpl:    e.Complemento,
+			XBairro: e.Bairro,
+		},
+		RegTrib: RegTrib{OpSimpNac: cfg.Nacional.OpSimpNac, RegEspTrib: cfg.Nacional.RegEspTrib},
+	}
+	if c := pr.Contato; c != nil {
+		p.Fone = fone(c.Telefone)
+		p.Email = strings.TrimSpace(c.Email)
+	}
+	return p, nil
 }
 
 func buildTomador(in *nota.Input) (*Pessoa, error) {

@@ -107,6 +107,10 @@ func TestBuildIDAndHeader(t *testing.T) {
 	assert.Equal(t, "3516309", d.InfDPS.CLocEmi)
 	assert.Equal(t, "3516309", d.InfDPS.Serv.LocPrest.CLocPrestacao)
 	assert.Equal(t, 1, d.InfDPS.Prest.RegTrib.OpSimpNac)
+	assert.Equal(t, "EMPRESA EXEMPLO LTDA", d.InfDPS.Prest.XNome)
+	require.NotNil(t, d.InfDPS.Prest.End)
+	assert.Equal(t, "0000000", d.InfDPS.Prest.End.EndNac.CMun)
+	assert.Equal(t, "1100000000", d.InfDPS.Prest.Fone)
 	assert.Nil(t, d.InfDPS.Valores.Trib.TribMun.PAliq, "pAliq is omitted for não optante in the issuing município")
 	require.NotNil(t, d.InfDPS.IBSCBS)
 	assert.Equal(t, "100301", d.InfDPS.IBSCBS.CIndOp)
@@ -164,7 +168,7 @@ func TestBuildMinimalGolden(t *testing.T) {
 	assert.NotContains(t, s, "<IBSCBS>")
 	assert.NotContains(t, s, "<cNBS>")
 	assert.NotContains(t, s, "<infoCompl>")
-	assert.NotContains(t, s, "<fone>")
+	assert.NotContains(t, s, "</xNome><fone>", "tomador without phone must not emit fone")
 	assert.Contains(t, s, "<CPF>12345678909</CPF>")
 }
 
@@ -229,6 +233,13 @@ func TestBuildErrors(t *testing.T) {
 		_, err := dps.Build(fixtureConfig(), in, fixtureDate())
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "endereço do tomador incompleto")
+	})
+	t.Run("prestador without address", func(t *testing.T) {
+		cfg := fixtureConfig()
+		cfg.Prestador.Endereco.CEP = ""
+		_, err := dps.Build(cfg, fixtureInput(), fixtureDate())
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "endereço do prestador")
 	})
 	t.Run("no nacional section", func(t *testing.T) {
 		cfg := fixtureConfig()
