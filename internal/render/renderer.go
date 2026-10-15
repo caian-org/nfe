@@ -11,8 +11,11 @@ import (
 // StatusInfo summarises the active configuration for the `status` command.
 type StatusInfo struct {
 	Ambiente           string  `json:"ambiente"`
-	SOAPMode           string  `json:"soap_mode"`
-	WSDLURL            string  `json:"wsdl_url"`
+	Modo               string  `json:"modo"` // "nacional" (SIGCORP REST) or "abrasf" (SOAP)
+	NacionalURL        string  `json:"nacional_url,omitempty"`
+	ProximoNumeroNFSe  int     `json:"proximo_numero_nfse,omitempty"`
+	SOAPMode           string  `json:"soap_mode,omitempty"`
+	WSDLURL            string  `json:"wsdl_url,omitempty"`
 	EndpointURL        string  `json:"endpoint_url,omitempty"`
 	RazaoSocial        string  `json:"razao_social"`
 	CNPJ               string  `json:"cnpj"`
@@ -30,16 +33,9 @@ func NewStatusInfo(cfg *config.Config) StatusInfo {
 	hasUser := cfg.Autenticacao.Usuario != "" && cfg.Autenticacao.Senha != ""
 	hasCert := cfg.Autenticacao.Certificado != nil &&
 		cfg.Autenticacao.Certificado.Path != ""
-	soapMode := "wsdl"
-	if cfg.EndpointURL() != "" {
-		soapMode = "endpoint"
-	}
-
-	return StatusInfo{
+	info := StatusInfo{
 		Ambiente:           cfg.Ambiente,
-		SOAPMode:           soapMode,
-		WSDLURL:            cfg.WSDLURL(),
-		EndpointURL:        cfg.EndpointURL(),
+		Modo:               "abrasf",
 		RazaoSocial:        cfg.Prestador.RazaoSocial,
 		CNPJ:               cfg.Prestador.CNPJ,
 		InscricaoMunicipal: cfg.Prestador.InscricaoMunicipal,
@@ -50,6 +46,20 @@ func NewStatusInfo(cfg *config.Config) StatusInfo {
 		UsingCertificate:   hasCert,
 		UsingBasicAuth:     hasUser,
 	}
+	if cfg.IsNacional() {
+		info.Modo = "nacional"
+		info.NacionalURL = cfg.NacionalURL()
+		info.ProximoNumeroNFSe = cfg.Configuracoes.ProximoNumeroNFSe
+		info.UsingBasicAuth = cfg.NacionalUsuario() != "" && cfg.Autenticacao.Senha != ""
+		return info
+	}
+	info.SOAPMode = "wsdl"
+	if cfg.EndpointURL() != "" {
+		info.SOAPMode = "endpoint"
+	}
+	info.WSDLURL = cfg.WSDLURL()
+	info.EndpointURL = cfg.EndpointURL()
+	return info
 }
 
 // Renderer writes command results to its underlying writer.
@@ -81,6 +91,7 @@ type EmitInfo struct {
 	DryRun     bool              `json:"dry_run"`
 	Verbose    bool              `json:"verbose,omitempty"`
 	Sucesso    bool              `json:"sucesso"`
+	Modo       string            `json:"modo,omitempty"`
 	NumeroRPS  int               `json:"numero_rps"`
 	NumeroNFSe string            `json:"numero_nfse,omitempty"`
 	NFSe       *QueriedNFSe      `json:"nfse,omitempty"`
@@ -89,6 +100,12 @@ type EmitInfo struct {
 	SignedXML  string            `json:"signed_xml,omitempty"`
 	Response   string            `json:"response,omitempty"`
 	ConfirmXML string            `json:"confirm_response,omitempty"`
+	// National mode (SIGCORP REST) fields.
+	Protocolo     string `json:"protocolo,omitempty"`
+	StatusProc    string `json:"status_processamento,omitempty"`
+	ChaveAcesso   string `json:"chave_acesso,omitempty"`
+	LinkImpressao string `json:"link_impressao,omitempty"`
+	NFSeXML       string `json:"nfse_xml,omitempty"`
 }
 
 // QueryInfo is the user-facing view of a query.
@@ -97,12 +114,17 @@ type QueryInfo struct {
 	Mensagens []MensagemRetorno `json:"mensagens,omitempty"`
 	NFSes     []QueriedNFSe     `json:"nfses,omitempty"`
 	Response  string            `json:"response,omitempty"`
+	// National mode (SIGCORP REST) fields.
+	Protocolo     string `json:"protocolo,omitempty"`
+	StatusProc    string `json:"status_processamento,omitempty"`
+	LinkImpressao string `json:"link_impressao,omitempty"`
 }
 
 // QueriedNFSe is the parsed view of a single NFS-e returned by query.
 type QueriedNFSe struct {
 	Numero             string `json:"numero,omitempty"`
 	CodigoVerificacao  string `json:"codigo_verificacao,omitempty"`
+	ChaveAcesso        string `json:"chave_acesso,omitempty"`
 	DataEmissao        string `json:"data_emissao,omitempty"`
 	ValorServicos      string `json:"valor_servicos,omitempty"`
 	RazaoSocialTomador string `json:"razao_social_tomador,omitempty"`

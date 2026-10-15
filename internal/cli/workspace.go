@@ -36,7 +36,7 @@ func (g *globalFlags) configPath() (string, error) {
 
 func (g *globalFlags) notaPath(id string) (string, error) {
 	if !notaIDRegex.MatchString(id) {
-		return "", fmt.Errorf("identificador da nota inválido %q: use nomes como \"mova\", sem caminho ou extensão .toml", id)
+		return "", fmt.Errorf("identificador da nota inválido %q: use nomes como \"exemplo\", sem caminho ou extensão .toml", id)
 	}
 	workspace, err := g.workspace()
 	if err != nil {

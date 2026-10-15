@@ -29,8 +29,8 @@ func NewRoot() *cobra.Command {
 
 	root := &cobra.Command{
 		Use:           "nfe",
-		Short:         "CLI para NFS-e ABRASF",
-		Long:          "Cliente de linha de comando para emissão, consulta e cancelamento de NFS-e seguindo o padrão ABRASF v2.04.",
+		Short:         "CLI para NFS-e (layout nacional via SIGCORP ou ABRASF v2.04)",
+		Long:          "Cliente de linha de comando para emissão e consulta de NFS-e: DPS do layout nacional via WS Padrão Nacional da SIGCORP (Franco da Rocha) ou envelopes ABRASF v2.04 via SOAP.",
 		Version:       Version,
 		SilenceUsage:  true,
 		SilenceErrors: false,

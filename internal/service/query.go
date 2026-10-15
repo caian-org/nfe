@@ -21,6 +21,9 @@ type QueryResult struct {
 
 // Query consults NFS-e by number or by date range against the WS.
 func (s *Service) Query(ctx context.Context, q abrasf.ConsultaQuery) (*QueryResult, error) {
+	if s.cfg.IsNacional() {
+		return nil, fmt.Errorf("query: %w: consulta por número ou período não existe na API da SIGCORP; use --protocolo", ErrNaoSuportadoNacional)
+	}
 	xmlBytes, err := abrasf.BuildConsultarServicoPrestado(
 		s.cfg.Prestador.CNPJ,
 		s.cfg.Prestador.InscricaoMunicipal,
@@ -65,6 +68,9 @@ func (s *Service) Query(ctx context.Context, q abrasf.ConsultaQuery) (*QueryResu
 
 // QueryByRPS consults an NFS-e by the RPS identifier used during emission.
 func (s *Service) QueryByRPS(ctx context.Context, rps abrasf.IdentificacaoRps) (*QueryResult, error) {
+	if s.cfg.IsNacional() {
+		return nil, fmt.Errorf("query: %w: consulta por RPS não existe na API da SIGCORP; use --protocolo", ErrNaoSuportadoNacional)
+	}
 	xmlBytes, err := abrasf.BuildConsultarPorRPS(
 		s.cfg.Prestador.CNPJ,
 		s.cfg.Prestador.InscricaoMunicipal,

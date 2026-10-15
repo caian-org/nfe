@@ -10,6 +10,7 @@ import (
 
 	"github.com/caian-org/nfe/internal/abrasf"
 	"github.com/caian-org/nfe/internal/config"
+	"github.com/caian-org/nfe/internal/dps"
 	"github.com/caian-org/nfe/internal/nota"
 	"github.com/caian-org/nfe/internal/render"
 	"github.com/caian-org/nfe/internal/service"
@@ -67,6 +68,11 @@ func newEmitCmd(gf *globalFlags) *cobra.Command {
 			ctx, cancel := contextWithTimeout(cmd, timeout)
 			defer cancel()
 
+			modo := "abrasf"
+			if cfg.IsNacional() {
+				modo = "nacional"
+			}
+
 			if dryRun {
 				res, err := svc.EmitDryRun(input)
 				if err != nil {
@@ -76,26 +82,63 @@ func newEmitCmd(gf *globalFlags) *cobra.Command {
 				progress.Report("confirmação", service.ProgressSkipped, "dry-run")
 				progress.Report("config", service.ProgressSkipped, "sem incremento")
 				progress.Close()
-				return gf.renderer(cmd).Emit(render.EmitInfo{
+				info := render.EmitInfo{
 					DryRun:    true,
 					Verbose:   verbose,
 					Sucesso:   true,
+					Modo:      modo,
 					NumeroRPS: res.NumeroRPS,
 					SignedXML: string(res.SignedXML),
-				})
+				}
+				if cfg.IsNacional() {
+					info.NumeroNFSe = res.NumeroNFSe
+				}
+				return gf.renderer(cmd).Emit(info)
 			}
 
 			res, err := svc.Emit(ctx, input)
-			info := render.EmitInfo{Verbose: verbose}
+			info := render.EmitInfo{Verbose: verbose, Modo: modo}
 			if res != nil {
 				info.NumeroRPS = res.NumeroRPS
 				info.NumeroNFSe = res.NumeroNFSe
+				info.Protocolo = res.Protocolo
 				info.Mensagens = mapMensagens(res.Mensagens)
 				info.Response = string(res.RawResponse)
 				info.SignedXML = string(res.SignedXML)
 			}
 			var msgErr *service.MessagesError
 			switch {
+			case err == nil && cfg.IsNacional():
+				// The platform accepted the DPS: persist the consumed counters
+				// before waiting, so a timeout or crash cannot reuse the number.
+				progress.Report("config", service.ProgressStarted, "salvando contadores")
+				if saveErr := config.Save(configPath, cfg); saveErr != nil {
+					progress.Report("config", service.ProgressFailed, saveErr.Error())
+					return fmt.Errorf("DPS recebida (protocolo %s) mas falhou ao salvar configuração: %w", res.Protocolo, saveErr)
+				}
+				progress.Report("config", service.ProgressDone, "contadores salvos")
+				info.Sucesso = true
+				if noConfirmationWait {
+					progress.Report("confirmação", service.ProgressSkipped, "não aguardada")
+					info.Pendente = true
+					break
+				}
+				conf, confErr := svc.WaitConfirmacao(cmd.Context(), res.Protocolo, confirmTimeout, confirmInterval)
+				applyConfirmacao(&info, conf)
+				switch {
+				case confErr == nil && conf != nil && conf.Final:
+					info.Sucesso = true
+				case confErr == nil:
+					info.Pendente = true
+				case errors.As(confErr, &msgErr):
+					info.Sucesso = false
+				default:
+					progress.Close()
+					if renderErr := gf.renderer(cmd).Emit(info); renderErr != nil {
+						return renderErr
+					}
+					return confErr
+				}
 			case err == nil:
 				info.Sucesso = true
 				if info.NumeroNFSe == "" {
@@ -175,6 +218,37 @@ func waitForEmissionConfirmation(ctx context.Context, svc *service.Service, nume
 			return nil, lastResponse, false
 		case <-time.After(interval):
 		}
+	}
+}
+
+// applyConfirmacao copies a SIGCORP confirmation into the rendered view.
+func applyConfirmacao(info *render.EmitInfo, conf *service.ConfirmResult) {
+	if conf == nil {
+		return
+	}
+	info.StatusProc = conf.Status
+	info.ConfirmXML = string(conf.RawResponse)
+	info.LinkImpressao = conf.LinkImpressao
+	info.NFSeXML = conf.NFSeXML
+	if len(conf.Mensagens) > 0 {
+		info.Mensagens = mapMensagens(conf.Mensagens)
+	}
+	if conf.NFSe != nil {
+		q := nfseToQueried(conf.NFSe, conf.LinkImpressao)
+		info.NFSe = &q
+		info.NumeroNFSe = firstNonEmpty(conf.NFSe.Numero, info.NumeroNFSe)
+		info.ChaveAcesso = conf.NFSe.ChaveAcesso
+	}
+}
+
+func nfseToQueried(n *dps.NFSe, link string) render.QueriedNFSe {
+	return render.QueriedNFSe{
+		Numero:             n.Numero,
+		ChaveAcesso:        n.ChaveAcesso,
+		DataEmissao:        formatEmissao(firstNonEmpty(n.DataProcesso, n.DataEmissao)),
+		ValorServicos:      n.ValorServicos,
+		RazaoSocialTomador: n.Tomador,
+		URL:                link,
 	}
 }
 

@@ -19,6 +19,9 @@ type CancelResult struct {
 
 // Cancel posts a CancelarNfseEnvio referencing the given NFS-e number.
 func (s *Service) Cancel(ctx context.Context, numeroNFSe string, codigo int) (*CancelResult, error) {
+	if s.cfg.IsNacional() {
+		return nil, fmt.Errorf("cancel: %w: a API da SIGCORP não oferece cancelamento; cancele pelo portal da prefeitura", ErrNaoSuportadoNacional)
+	}
 	in := abrasf.CancelInput{
 		NumeroNfse:         numeroNFSe,
 		CNPJ:               s.cfg.Prestador.CNPJ,

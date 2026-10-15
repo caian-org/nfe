@@ -2,8 +2,10 @@ package cli
 
 import (
 	"bytes"
+	"context"
 	"encoding/xml"
 	"errors"
+	"fmt"
 	"html"
 	"strings"
 	"time"
@@ -19,17 +21,21 @@ import (
 func newQueryCmd(gf *globalFlags) *cobra.Command {
 	var (
 		numero      string
+		protocolo   string
 		dataInicial string
 		dataFinal   string
 		timeout     time.Duration
 	)
 	cmd := &cobra.Command{
 		Use:   "query",
-		Short: "Consulta NFS-e por número ou intervalo de datas",
+		Short: "Consulta NFS-e por protocolo (nacional), número ou intervalo de datas",
 		Args:  cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if numero == "" && (dataInicial == "" || dataFinal == "") {
-				return errors.New("informe --numero ou ambos --data-inicial e --data-final")
+			if protocolo != "" && (numero != "" || dataInicial != "" || dataFinal != "") {
+				return errors.New("--protocolo não pode ser combinado com --numero ou datas")
+			}
+			if protocolo == "" && numero == "" && (dataInicial == "" || dataFinal == "") {
+				return errors.New("informe --protocolo, --numero ou ambos --data-inicial e --data-final")
 			}
 
 			configPath, err := gf.configPath()
@@ -46,6 +52,13 @@ func newQueryCmd(gf *globalFlags) *cobra.Command {
 			}
 			ctx, cancel := contextWithTimeout(cmd, timeout)
 			defer cancel()
+
+			if protocolo != "" {
+				return runQueryProtocolo(cmd, gf, svc, ctx, protocolo)
+			}
+			if cfg.IsNacional() {
+				return fmt.Errorf("query: %w: no WS Padrão Nacional a consulta é por protocolo (--protocolo)", service.ErrNaoSuportadoNacional)
+			}
 
 			res, err := svc.Query(ctx, abrasf.ConsultaQuery{
 				Numero:      numero,
@@ -70,11 +83,36 @@ func newQueryCmd(gf *globalFlags) *cobra.Command {
 			return gf.renderer(cmd).Query(info)
 		},
 	}
-	cmd.Flags().StringVarP(&numero, "numero", "n", "", "número da NFS-e a consultar")
+	cmd.Flags().StringVarP(&numero, "numero", "n", "", "número da NFS-e a consultar (ABRASF)")
+	cmd.Flags().StringVarP(&protocolo, "protocolo", "p", "", "protocolo devolvido pela recepção da DPS (WS Padrão Nacional)")
 	cmd.Flags().StringVar(&dataInicial, "data-inicial", "", "data inicial (AAAA-MM-DD) para consulta por período")
 	cmd.Flags().StringVar(&dataFinal, "data-final", "", "data final (AAAA-MM-DD) para consulta por período")
 	cmd.Flags().DurationVar(&timeout, "wait-timeout", 0, "timeout da requisição (ex.: 30s, 2m)")
 	return cmd
+}
+
+func runQueryProtocolo(cmd *cobra.Command, gf *globalFlags, svc *service.Service, ctx context.Context, protocolo string) error {
+	res, err := svc.QueryProtocolo(ctx, protocolo)
+	info := render.QueryInfo{Protocolo: protocolo}
+	if res != nil {
+		info.StatusProc = res.Status
+		info.Response = string(res.RawResponse)
+		info.LinkImpressao = res.LinkImpressao
+		info.Mensagens = mapMensagens(res.Mensagens)
+		if res.NFSe != nil {
+			info.NFSes = []render.QueriedNFSe{nfseToQueried(res.NFSe, res.LinkImpressao)}
+		}
+	}
+	var msgErr *service.MessagesError
+	switch {
+	case err == nil:
+		info.Sucesso = true
+	case errors.As(err, &msgErr):
+		info.Sucesso = false
+	default:
+		return err
+	}
+	return gf.renderer(cmd).Query(info)
 }
 
 // parseQueriedNFSes extracts a flat list of NFS-e records from a query

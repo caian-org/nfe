@@ -5,12 +5,14 @@ package service
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
 
 	"github.com/caian-org/nfe/internal/abrasf"
 	"github.com/caian-org/nfe/internal/config"
+	"github.com/caian-org/nfe/internal/sigcorp"
 	"github.com/caian-org/nfe/internal/soap"
 	"github.com/caian-org/nfe/internal/xmlsig"
 )
@@ -19,6 +21,12 @@ import (
 // an interface so service tests can swap in a stub.
 type soapCaller interface {
 	Call(ctx context.Context, action string, body []byte) ([]byte, error)
+}
+
+// restCaller is the subset of *sigcorp.Client used by the national flow.
+type restCaller interface {
+	Recepcionar(ctx context.Context, nNFSe string, dps []byte) (*sigcorp.Recepcao, []byte, error)
+	Consultar(ctx context.Context, protocolo string) (*sigcorp.Consulta, []byte, error)
 }
 
 // Service orchestrates the NFS-e operations against ABRASF. A nil signer is
@@ -33,6 +41,9 @@ type Service struct {
 	soap     soapCaller
 	soapErr  error
 	soapOne  sync.Once
+	rest     restCaller
+	restErr  error
+	restOne  sync.Once
 	tlsCert  *tls.Certificate
 	signer   *xmlsig.Signer
 	progress ProgressFunc
@@ -66,6 +77,7 @@ type ProgressFunc func(ProgressEvent)
 type Options struct {
 	Config   *config.Config
 	SOAP     soapCaller     // when nil, New builds a default *soap.Client from Config
+	REST     restCaller     // when nil, New builds a *sigcorp.Client from Config ([nacional])
 	Signer   *xmlsig.Signer // when nil, New loads the A1 certificate from Config
 	Now      func() time.Time
 	Progress ProgressFunc
@@ -79,7 +91,7 @@ func New(opts Options) (*Service, error) {
 	if opts.Config == nil {
 		return nil, fmt.Errorf("service: Config é obrigatório")
 	}
-	s := &Service{cfg: opts.Config, soap: opts.SOAP, signer: opts.Signer, now: opts.Now, progress: opts.Progress}
+	s := &Service{cfg: opts.Config, soap: opts.SOAP, rest: opts.REST, signer: opts.Signer, now: opts.Now, progress: opts.Progress}
 	if s.now == nil {
 		s.now = time.Now
 	}
@@ -138,6 +150,34 @@ func (s *Service) ensureSOAP() error {
 	})
 	return s.soapErr
 }
+
+// ensureREST builds the SIGCORP client on first use (national mode only).
+func (s *Service) ensureREST() error {
+	s.restOne.Do(func() {
+		if s.rest != nil {
+			return
+		}
+		if !s.cfg.IsNacional() {
+			s.restErr = errors.New("service: seção [nacional] ausente no config.toml")
+			return
+		}
+		client, err := sigcorp.NewClient(sigcorp.Options{
+			BaseURL: s.cfg.NacionalURL(),
+			Usuario: s.cfg.NacionalUsuario(),
+			Senha:   s.cfg.Autenticacao.Senha,
+			CNPJ:    s.cfg.Prestador.CNPJ,
+		})
+		if err != nil {
+			s.restErr = fmt.Errorf("service: construir cliente nacional: %w", err)
+			return
+		}
+		s.rest = client
+	})
+	return s.restErr
+}
+
+// ErrNaoSuportadoNacional marks ABRASF-only operations invoked in national mode.
+var ErrNaoSuportadoNacional = errors.New("operação indisponível no WS Padrão Nacional")
 
 func abrasfSOAPActions(prefix string) map[string]string {
 	ops := []string{

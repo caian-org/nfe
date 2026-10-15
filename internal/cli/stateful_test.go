@@ -80,6 +80,7 @@ func fakeABRASFByAction(t *testing.T, responses map[string]string) *httptest.Ser
 func workspaceWith(t *testing.T, srv *httptest.Server) string {
 	t.Helper()
 	cfg := config.Default()
+	cfg.Nacional = nil // these fixtures exercise the ABRASF/SOAP path
 	cfg.Autenticacao.Usuario = "u"
 	cfg.Autenticacao.Senha = "p"
 	cfg.SOAP.WSDLHomologacao = srv.URL + "?wsdl"
@@ -134,6 +135,7 @@ func soapEnvelope(body string) string {
 func TestEmitDryRunNoNetwork(t *testing.T) {
 	// Point at a URL that would refuse if dialed.
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
@@ -156,6 +158,7 @@ func TestEmitDryRunNoNetwork(t *testing.T) {
 
 func TestEmitDryRunProgressGoesToStderr(t *testing.T) {
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
@@ -176,6 +179,7 @@ func TestEmitDryRunProgressGoesToStderr(t *testing.T) {
 
 func TestEmitDryRunJSONDoesNotRenderProgress(t *testing.T) {
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
@@ -194,6 +198,7 @@ func TestEmitDryRunJSONDoesNotRenderProgress(t *testing.T) {
 
 func TestEmitDryRunVerboseRendersSignedXML(t *testing.T) {
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
@@ -214,7 +219,7 @@ func TestEmitSuccessBumpsCounterOnDisk(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID)
 	require.NoError(t, err)
 	assert.Contains(t, out, "NFS-e emitida")
@@ -232,7 +237,7 @@ func TestEmitVerboseRendersSOAPResponse(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--verbose")
 	require.NoError(t, err)
 	assert.Contains(t, out, "XML assinado:")
@@ -248,7 +253,7 @@ func TestEmitPollsRPSConfirmationWhenResponseIsAsync(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--verbose")
 	require.NoError(t, err)
 	assert.Contains(t, out, "NFS-e emitida")
@@ -267,7 +272,7 @@ func TestEmitKeepsPendingWhenRPSConfirmationHasOnlySituacao(t *testing.T) {
 
 	workspace := workspaceWith(t, srv)
 	setConfirmationDurations(t, workspace, "20ms", "1ms")
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID)
 	require.NoError(t, err)
 	assert.Contains(t, out, "solicitação de NFS-e enviada")
@@ -283,7 +288,7 @@ func TestEmitNoConfirmationWaitSkipsRPSPolling(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--no-confirmation-wait")
 	require.NoError(t, err)
 	assert.Contains(t, out, "solicitação recebida; confirmação da NFS-e ainda pendente")
@@ -295,7 +300,7 @@ func TestEmitErrorsLeaveCounterAlone(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID)
 	require.NoError(t, err, "WS rejection must NOT surface as a CLI error; the renderer handles it")
 	assert.Contains(t, out, "falha na emissão")
@@ -326,6 +331,7 @@ func TestQueryUsesConfiguredEndpointWhenWSDLIsUnavailable(t *testing.T) {
 	defer srv.Close()
 
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.Autenticacao.Usuario = "u"
 	cfg.Autenticacao.Senha = "p"
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1/unavailable?wsdl"

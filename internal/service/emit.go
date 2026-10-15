@@ -11,12 +11,14 @@ import (
 // EmitResult is what Emit returns on success. On failure (validation, network,
 // or business rules) Emit returns an error and *EmitResult is nil.
 type EmitResult struct {
-	NumeroRPS   int    // Sequence number used for this RPS (already bumped on success).
-	NumeroNFSe  string // Authorized NFS-e number returned by the WS, when present.
+	NumeroRPS   int    // Sequence number used for this RPS / DPS (already bumped on success).
+	NumeroNFSe  string // NFS-e number: returned by ABRASF, or chosen upfront in national mode.
 	UnsignedXML []byte // The XML pre-signing — useful for debugging.
 	SignedXML   []byte // The XML actually posted (or that would be posted on dry-run).
-	RawResponse []byte // The SOAP response body returned by the WS. Empty on dry-run.
+	RawResponse []byte // The SOAP body or the recepção JSON returned by the WS. Empty on dry-run.
 	Mensagens   []abrasf.MensagemRetorno
+	// Protocolo is the SIGCORP processing protocol (national mode only).
+	Protocolo string
 }
 
 // Emit posts a new NFS-e to the WS. On success it bumps cfg.Configuracoes.
@@ -25,6 +27,9 @@ type EmitResult struct {
 func (s *Service) Emit(ctx context.Context, in *nota.Input) (*EmitResult, error) {
 	if errs := nota.Validate(in); len(errs) > 0 {
 		return nil, fmt.Errorf("input inválido: %s", joinErrors(errs))
+	}
+	if s.cfg.IsNacional() {
+		return s.emitNacional(ctx, in)
 	}
 
 	s.report("xml", ProgressStarted, "montando RPS")
@@ -102,6 +107,9 @@ func (s *Service) Emit(ctx context.Context, in *nota.Input) (*EmitResult, error)
 func (s *Service) EmitDryRun(in *nota.Input) (*EmitResult, error) {
 	if errs := nota.Validate(in); len(errs) > 0 {
 		return nil, fmt.Errorf("input inválido: %s", joinErrors(errs))
+	}
+	if s.cfg.IsNacional() {
+		return s.emitDryRunNacional(in)
 	}
 	s.report("xml", ProgressStarted, "montando RPS")
 	inf := abrasf.BuildRPS(s.cfg, in, s.now())
