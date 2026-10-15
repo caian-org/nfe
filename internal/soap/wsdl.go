@@ -50,9 +50,12 @@ func FetchWSDL(ctx context.Context, url string, tlsCfg *tls.Config, timeout time
 	}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("wsdl: buscar %s: %w", url, err)
+		return nil, classifyTransportErr("wsdl: buscar "+url, url, err)
 	}
 	defer resp.Body.Close()
+	if isGatewayStatus(resp.StatusCode) {
+		return nil, &UnavailableError{URL: url, Status: resp.StatusCode}
+	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("wsdl: buscar %s: HTTP %d", url, resp.StatusCode)
 	}
