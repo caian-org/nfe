@@ -18,7 +18,7 @@ the ABRASF/SOAP path (`nf-abrasf-xml`, `nf-soap-wsdl`) is used.
 ## Wire format
 
 `internal/dps/types.go` mirrors the Sistema Nacional NFS-e XSD v1.01
-(`docs/vendor/franco-da-rocha/nacional/xsd/Schemas/1.01/`). Invariants:
+(`docs/vendor/franco-da-rocha/nacional/xsd-1.01/`). Invariants:
 
 1. Struct field order = XSD sequence order. Reordering breaks the schema.
 2. Element names are case-sensitive and mostly lowerCamel (`infDPS`,

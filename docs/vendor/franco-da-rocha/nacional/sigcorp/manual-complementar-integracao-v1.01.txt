@@ -1,0 +1,136 @@
+Fonte: https://sigcorp.com.br/manual-complementar-de-integracao-nfs-e/ (capturado em 2026-10-15)
+
+Este é um Manual Complementar de Integração — NFS-e ao Manual de Orientação do Sistema Nacional NFS-e (ADN). Versão 1.01 de 01/09/2026
+1. Introdução
+Este documento descreve as particularidades do webservice próprio para emissão e consulta de Notas Fiscais de Serviço Eletrônica (NFS-e), utilizado pelos municípios atendidos por esta plataforma.
+Este manual é COMPLEMENTAR ao Manual de Orientação do Contribuinte do Sistema Nacional NFS-e (ADN). A estrutura do XML da DPS (Declaração de Prestação de Serviço) enviada segue integralmente o padrão nacional definido pela ADN. Este documento trata apenas do que é específico desta plataforma: autenticação, formato de transporte, endpoints e regras de validação adicionais.
+Em caso de dúvida sobre o conteúdo do XML da DPS em si (campos, obrigatoriedade, domínios), consulte o Manual de Orientação do Sistema Nacional NFS-e, disponível no portal oficial da ADN.
+2. Autenticação
+O acesso ao webservice é autenticado por login e senha do prestador — não é exigido certificado digital, diferentemente do padrão previsto pela ADN.
+Usuário: Inscrição Municipal (IM) do prestador.
+Senha: senha cadastrada do prestador junto ao município.
+Mecanismo: HTTP Basic Authentication, no cabeçalho Authorization.
+Authorization: Basic <base64(IM:senha)>
+Além do usuário e senha, é necessário informar o CNPJ do prestador em um cabeçalho próprio, em todas as chamadas (recepção e consulta):
+X-NFSe-Prestador-CNPJ: <CNPJ do prestador, apenas números>
+O CNPJ informado neste cabeçalho deve corresponder ao prestador identificado na DPS (na recepção) ou ao prestador que emitiu a nota consultada (na consulta). Divergência resulta em rejeição do acesso.
+3. Endpoint de recepção
+Item
+Detalhe
+Método / URL
+POST https://webservice.meumunicipio.online/v1/nfse/recepcao
+Content-Type
+application/xml ou text/xml (outros valores são rejeitados)
+Corpo
+XML da DPS, no padrão do Sistema Nacional NFS-e, sem alterações
+Tamanho máximo
+2 MB
+3.1 Cabeçalhos obrigatórios
+Cabeçalho
+Descrição
+Authorization
+Basic Auth — IM e senha do prestador (ver seção 2)
+X-NFSe-Prestador-CNPJ
+CNPJ do prestador, apenas números (ver seção 2)
+X-NFSe-nNFSe
+Número da nota, definido pelo próprio prestador (ver seção 5.1)
+3.2 Resposta
+HTTP
+Situação
+Corpo
+202
+Nota aceita, em processamento
+{ “protocolo”: “…” }
+400
+XML malformado, Content-Type inválido ou cabeçalho obrigatório ausente/inválido
+Detalhe do erro
+401
+Falha de autenticação (IM/senha/CNPJ)
+—
+403
+IM do cabeçalho de autenticação diverge do IM do prestador na DPS
+—
+O protocolo retornado deve ser guardado pelo integrador — é ele que identifica a nota nas consultas posteriores . O protocolo não é a chave de acesso definitiva da NFS-e; a chave de acesso só é conhecida após a aprovação da nota (ver seção 4).
+4. Endpoint de consulta
+Item
+Detalhe
+Método / URL
+GET https://webservice.meumunicipio.online/v1/nfse/consulta/{protocolo}
+Autenticação
+Mesma da recepção (Basic Auth + X-NFSe-Prestador-CNPJ) — ver seção 2
+A consulta só retorna dados de notas emitidas pelo próprio prestador autenticado. Não é possível consultar notas de terceiros.
+4.1 Situações de retorno
+status
+Significado
+Dados adicionais
+em_processamento
+Nota recebida, ainda em validação ou aguardando processamento pela ADN
+—
+rejeitado
+Nota rejeitada nas validações do próprio webservice
+Lista de motivos da rejeição
+recusada
+Nota recusada pelo Ambiente Nacional (ADN)
+Motivo retornado pela ADN
+erro_interno
+Falha técnica no processamento
+Mensagem genérica — nossa equipe é notificada automaticamente
+aprovado
+Nota emitida com sucesso
+XML da NFS-e, chave de acesso e link de impressão
+4.2 Resposta em caso de aprovação
+{ “status”: “aprovado”, “protocolo”: “…”, “nfse”: “<XML da NFS-e no padrão ADN>”, “linkImpressao”: “https://…” }
+O campo nfse contém o XML completo da NFS-e no padrão oficial do Sistema Nacional NFS-e, sem nenhuma alteração — pode ser processado pelos mesmos meios já utilizados para o padrão nacional. O linkImpressao é um campo adicional desta plataforma, não faz parte do padrão da ADN, e aponta para a página de impressão do DANFSe (representação em PDF da nota).
+5. Particularidades em relação ao padrão nacional
+Esta seção resume os pontos em que esta plataforma se diferencia do fluxo padrão de emissão direta pela ADN.
+5.1 Número da nota (nNFSe) informado pelo prestador
+No padrão nacional, o número da NFS-e (nNFSe) é atribuído por quem emite a nota. Nesta plataforma, para permitir maior controle e integração pelo próprio prestador, esse número deve ser informado pelo prestador no cabeçalho X-NFSe-nNFSe (ver seção 3.1) — numérico, até 13 dígitos.
+Esse número é diferente do número do RPS (campo nDPS do XML), que continua sendo de uso interno do sistema do prestador.
+Números repetidos para o mesmo prestador são rejeitados (nota duplicada).
+5.2 Sem exigência de certificado digital
+Importante : O acesso é autenticado por login e senha (seção 2), não por certificado digital A1/A3, como previsto no padrão nacional.
+6. Grupo IBSCBS (IBS/CBS)
+O grupo IBSCBS da DPS trata dos tributos federais/estaduais criados pela reforma tributária (IBS e CBS). A exigência deste grupo pela ADN já foi adiada mais de uma vez desde sua previsão original — por isso, esta plataforma trata o grupo como OPCIONAL: se ele não for enviado, é simplesmente ignorado, sem qualquer impacto na emissão da nota.
+Quando o grupo IBSCBS for enviado, valem as regras abaixo. Esta plataforma não realiza nenhum cálculo de IBS/CBS por conta do prestador — todos os campos exigidos pelo padrão nacional devem ser informados por completo.
+6.1 Campos obrigatórios quando o grupo é enviado
+cIndOp, cClassTrib e CST são sempre obrigatórios quando o grupo IBSCBS está presente, conforme o padrão nacional.
+cNBS: no padrão nacional este campo é opcional, mas nesta plataforma passa a ser OBRIGATÓRIO sempre que o grupo IBSCBS é enviado. Sem ele, a combinação de tributação não pode ser localizada e a nota é rejeitada.
+6.2 Prestadores optantes pelo Simples Nacional
+Prestadores optantes pelo Simples Nacional NÃO PODEM enviar o grupo IBSCBS em nenhuma hipótese. O envio deste grupo por um prestador do Simples Nacional resulta em rejeição da nota.
+6.3 Grupo imóvel (dentro de IBSCBS)
+A presença do subgrupo imóvel depende do código de tributação nacional (cTribNac) e do código indicador de operação (cIndOp) informados, conforme ANEXO I, do layout nacional:
+Para determinados subitens de serviço ligados a obras/imóveis, o grupo imóvel NÃO PODE ser enviado.
+Para operações classificadas como relativas a imóveis (cIndOp específico), o grupo imóvel é OBRIGATÓRIO.
+Fora dessas duas situações, o grupo imóvel também não pode ser enviado.
+Quando o grupo imóvel é obrigatório, todos os seus campos — incluindo o cCIB (Cadastro Imobiliário Brasileiro) e/ou endereço completo do imóvel — devem ser informados pelo prestador. Esta plataforma não deriva esses dados de nenhuma outra informação da nota.
+7. Quando a alíquota (pAliq) deve ser declarada
+Como regra geral, a alíquota do ISSQN é obtida automaticamente da tabela de serviços do município, não sendo necessário informá-la na DPS. Existem, porém, duas situações em que a plataforma não tem como determinar a alíquota sozinha — nesses casos, o campo pAliq passa a ser OBRIGATÓRIO , dentro da faixa permitida:
+Valor mínimo: 2%
+Valor máximo: 5%
+Se o campo pAliq não for informado, ou for informado fora dessa faixa, a nota será rejeitada nas duas situações abaixo.
+6.1 Prestadores optantes pelo Simples Nacional
+Para prestadores optantes pelo Simples Nacional (opSimpNac = 2 — MEI, ou opSimpNac = 3 — ME/EPP), a alíquota efetiva varia conforme o faturamento do prestador, não havendo um valor fixo na tabela municipal. Nesse caso, pAliq deve ser informado (motivo de rejeição: ALIQUOTA_SIMPLES_INVALIDA).
+Atenção : a partir de 01/11, prestadores optantes pelo Simples Nacional passam a ser obrigados a emitir suas notas diretamente pelo portal do Sistema Nacional NFS-e. A partir dessa data, o uso desta plataforma por esse público tende a ser residual.
+6.2 Incidência do ISSQN em município diferente do município de emissão
+Quando o local de incidência do ISSQN (cLocIncid, calculado a partir das regras da DPS) é diferente do município de emissão da nota, a plataforma não possui acesso à tabela de alíquotas do outro município. Nesse caso, pAliq também deve ser informado (motivo de rejeição: ALIQUOTA_INCIDENCIA_INVALIDA).
+Fora dessas duas situações, o campo pAliq é ignorado, se enviado — a alíquota é sempre obtida da tabela do próprio município.
+8. Motivos de rejeição específicos desta plataforma
+Além das validações previstas no padrão nacional, esta plataforma aplica validações próprias, baseadas no cadastro municipal e em regras de consistência da própria DPS. Uma nota pode ser rejeitada por:
+Prestador não autorizado a emitir nota com o código de serviço informado.
+Tomador ou intermediário, pessoa jurídica do próprio município, sem cadastro prévio junto à prefeitura — nesse caso é necessário comparecer presencialmente para regularização.
+Número da nota (nNFSe) já utilizado anteriormente pelo mesmo prestador.
+Isenção ou imunidade declarada sem que o prestador possua esse benefício registrado no cadastro municipal.
+Alíquota (pAliq) ausente ou fora da faixa permitida, nas situações em que ela é obrigatória (seção 7).
+Retenção do ISSQN declarada sem o respectivo tomador ou intermediário identificado por CPF/CNPJ.
+CNPJ do tomador igual ao do prestador, ou raiz de CNPJ do intermediário igual à do prestador.
+E-mail do prestador, tomador ou intermediário em formato inválido.
+Endereço nacional e endereço no exterior informados de forma incompatível com o tipo de identificação (CPF/CNPJ indicando prestador/tomador/intermediário/destinatário nacional; NIF indicando exterior) — vale para prestador, tomador, intermediário, destinatário do IBSCBS e fornecedor de documento de dedução, além dos endereços de obra, evento e imóvel.
+Grupo IBSCBS enviado por prestador optante do Simples Nacional (seção 6.2).
+Grupo cNBS ausente quando o grupo IBSCBS é enviado (seção 6.1).
+Grupo imóvel enviado ou ausente de forma incompatível com o serviço/operação informados (seção 6.3).
+Combinação de classificação tributária (cClassTrib, NBS, cIndOp, código de tributação nacional) não localizada na tabela de referência municipal, quando o grupo IBSCBS é enviado.
+O motivo detalhado de cada rejeição é sempre retornado na consulta (seção 4), permitindo que o sistema do prestador identifique e corrija o problema antes de reenviar a nota.
+9. Observações finais
+Este documento pode ser atualizado sem aviso prévio conforme evoluções da plataforma ou do padrão nacional.
+Dúvidas sobre o conteúdo da DPS em si devem ser direcionadas ao Manual de Orientação do Sistema Nacional NFS-e (ADN).
+Dúvidas sobre esta plataforma (endpoints, autenticação, regras próprias) devem ser direcionadas à equipe responsável pela integração.

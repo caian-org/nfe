@@ -102,7 +102,7 @@ Hosts publicados pela prefeitura (`nfe init` já os escreve):
 | homologacao | `https://qa-webservice.meumunicipio.online` |
 
 Fonte: página "Integração WS Padrão Nacional" do portal ISS e o Manual
-Complementar de Integração da SIGCORP v1.01 (01/09/2026); cópias em
+Complementar de Integração da SIGCORP v1.01 (01/09/2026); texto em
 `docs/vendor/franco-da-rocha/nacional/sigcorp/`.
 
 ## Configuração (TOML)
