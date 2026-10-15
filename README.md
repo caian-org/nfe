@@ -161,7 +161,7 @@ senha = "${NFE_CERT_PASS}"
 serie_rps           = "A"      # série do RPS no modo ABRASF
 proximo_numero_rps  = 1        # nDPS no modo nacional / RPS no ABRASF
 proximo_numero_nfse = 1        # número da NFS-e enviado em X-NFSe-nNFSe (modo nacional)
-codigo_municipio    = "3516309" # IBGE do município emissor (cLocEmi)
+codigo_municipio    = "3516408" # IBGE do município emissor (cLocEmi); Franco da Rocha = 3516408
 aliquota_iss        = 2.0
 confirm_timeout     = "2m"
 confirm_interval    = "5s"
@@ -207,7 +207,7 @@ discriminacao = "DESCRIÇÃO DO SERVIÇO PRESTADO"
 valor_servicos = 1000.0
 item_lista_servico = "0101"
 codigo_tributacao_nacional = "010101"  # cTribNac, obrigatório no modo nacional
-local_prestacao = "3516309"            # opcional; padrão = codigo_municipio do config
+local_prestacao = "3516408"            # opcional; padrão = codigo_municipio do config
 iss_retido = false
 aliquota = 2.0                         # só vai na DPS (pAliq) para Simples ou prestação fora do município
 
