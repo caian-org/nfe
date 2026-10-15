@@ -93,7 +93,7 @@ func Build(cfg *config.Config, in *nota.Input, now time.Time) (*DPS, error) {
 			TpEmit:   TpEmitPrestador,
 			CLocEmi:  cLocEmi,
 			Prest: Prestador{
-				CNPJ: cfg.Prestador.CNPJ,
+				CNPJ: digits(cfg.Prestador.CNPJ),
 				IM:   cfg.Prestador.InscricaoMunicipal,
 				RegTrib: RegTrib{
 					OpSimpNac:  cfg.Nacional.OpSimpNac,
@@ -117,7 +117,30 @@ func Build(cfg *config.Config, in *nota.Input, now time.Time) (*DPS, error) {
 
 // ID composes the 45-character infDPS identifier (Anexo I, campo 101).
 func ID(cLocEmi, cnpj, serie, nDPS string) string {
-	return "DPS" + cLocEmi + "2" + leftPad(cnpj, 14) + leftPad(serie, 5) + leftPad(nDPS, 15)
+	return "DPS" + cLocEmi + "2" + leftPad(digits(cnpj), 14) + leftPad(serie, 5) + leftPad(nDPS, 15)
+}
+
+// digits keeps only 0-9: the national layout types CNPJ, CPF, CEP and fone
+// as numeric strings, while notas are often written with punctuation.
+func digits(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= '0' && r <= '9' {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
+// fone normalizes a phone number to TSTelefone ([0-9]{6,20}); anything
+// shorter is dropped because the element is optional and a bad value is a
+// structural rejection.
+func fone(s string) string {
+	d := digits(s)
+	if len(d) < 6 || len(d) > 20 {
+		return ""
+	}
+	return d
 }
 
 func leftPad(s string, n int) string {
@@ -129,7 +152,7 @@ func leftPad(s string, n int) string {
 
 func buildTomador(in *nota.Input) (*Pessoa, error) {
 	t := in.Tomador
-	p := &Pessoa{CNPJ: t.CNPJ, CPF: t.CPF, XNome: t.RazaoSocial, Fone: t.Telefone, Email: t.Email}
+	p := &Pessoa{CNPJ: digits(t.CNPJ), CPF: digits(t.CPF), XNome: t.RazaoSocial, Fone: fone(t.Telefone), Email: strings.TrimSpace(t.Email)}
 	e := t.Endereco
 	filled := e.CodigoMunicipio != "" || e.CEP != "" || e.Endereco != "" || e.Numero != "" || e.Bairro != ""
 	if !filled {
@@ -139,7 +162,7 @@ func buildTomador(in *nota.Input) (*Pessoa, error) {
 		return nil, errors.New("endereço do tomador incompleto: codigo_municipio, cep, endereco, numero e bairro são obrigatórios no layout nacional")
 	}
 	p.End = &Endereco{
-		EndNac:  EnderecoNac{CMun: e.CodigoMunicipio, CEP: e.CEP},
+		EndNac:  EnderecoNac{CMun: e.CodigoMunicipio, CEP: digits(e.CEP)},
 		XLgr:    e.Endereco,
 		Nro:     e.Numero,
 		XCpl:    e.Complemento,

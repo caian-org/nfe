@@ -191,6 +191,12 @@ func ParseConsulta(body []byte) (*Consulta, error) {
 			cons.Motivos = append(cons.Motivos, flatten(v)...)
 		}
 	}
+	if code, msg := str(generic["codigo_erro"]), str(generic["mensagem_erro"]); msg != "" {
+		if code != "" {
+			msg = code + ": " + msg
+		}
+		cons.Motivos = append(cons.Motivos, msg)
+	}
 	if cons.Status == "" {
 		return nil, errors.New("sigcorp: resposta da consulta sem campo status")
 	}
@@ -229,8 +235,8 @@ func flatten(v any) []string {
 		}
 		return out
 	case map[string]any:
-		code := firstStr(t, "codigo", "code", "campo", "field")
-		msg := firstStr(t, "mensagem", "message", "descricao", "motivo", "detalhe", "erro")
+		code := firstStr(t, "codigo", "codigo_erro", "code", "campo", "field")
+		msg := firstStr(t, "mensagem", "mensagem_erro", "message", "descricao", "motivo", "detalhe", "erro")
 		switch {
 		case code != "" && msg != "":
 			return []string{code + ": " + msg}
@@ -291,10 +297,16 @@ func extractMessage(body []byte) (string, error) {
 	if err := json.Unmarshal(body, &m); err != nil {
 		return "", err
 	}
-	parts := flatten(m["message"])
-	parts = append(parts, flatten(m["mensagem"])...)
-	parts = append(parts, flatten(m["erros"])...)
-	parts = append(parts, flatten(m["errors"])...)
+	var parts []string
+	if code, msg := str(m["codigo_erro"]), str(m["mensagem_erro"]); msg != "" {
+		if code != "" {
+			msg = code + ": " + msg
+		}
+		parts = append(parts, msg)
+	}
+	for _, key := range []string{"message", "mensagem", "erros", "errors", "motivos", "detalhes"} {
+		parts = append(parts, flatten(m[key])...)
+	}
 	return strings.Join(parts, "; "), nil
 }
 

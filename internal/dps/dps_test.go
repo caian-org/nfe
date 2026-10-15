@@ -238,6 +238,23 @@ func TestBuildErrors(t *testing.T) {
 	})
 }
 
+func TestBuildNormalizesNumericFields(t *testing.T) {
+	in := fixtureInput()
+	in.Tomador.Telefone = "(11) 5555-5794"
+	in.Tomador.CNPJ = "44.555.666/0001-70"
+	in.Tomador.Endereco.CEP = "01234-000"
+	d, err := dps.Build(fixtureConfig(), in, fixtureDate())
+	require.NoError(t, err)
+	assert.Equal(t, "1155555794", d.InfDPS.Toma.Fone)
+	assert.Equal(t, "44555666000170", d.InfDPS.Toma.CNPJ)
+	assert.Equal(t, "01234000", d.InfDPS.Toma.End.EndNac.CEP)
+
+	in.Tomador.Telefone = "123"
+	d, err = dps.Build(fixtureConfig(), in, fixtureDate())
+	require.NoError(t, err)
+	assert.Empty(t, d.InfDPS.Toma.Fone, "too-short phone is omitted rather than rejected by the platform")
+}
+
 func TestBuildOmitsEmptyTomadorAddress(t *testing.T) {
 	in := fixtureInput()
 	in.Tomador.Endereco = nota.Endereco{}

@@ -57,6 +57,7 @@ func TestRecepcionarHTTPErrors(t *testing.T) {
 		{http.StatusBadRequest, `{"message":"Header X-NFSe-nNFSe ausente."}`, "HTTP 400"},
 		{http.StatusUnauthorized, `{"message":"Header Authorization Basic ausente.","error":"Unauthorized","statusCode":401}`, "credenciais recusadas"},
 		{http.StatusForbidden, ``, "HTTP 403"},
+		{http.StatusBadRequest, `{"codigo_erro":"ESTRUTURAL","mensagem_erro":"Tipo inválido para /toma/fone; esperado N."}`, "ESTRUTURAL: Tipo inválido para /toma/fone"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.want, func(t *testing.T) {
