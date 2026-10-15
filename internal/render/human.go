@@ -34,7 +34,17 @@ func (r *humanRenderer) Status(s StatusInfo) error {
 	r.headline("status do nfe")
 	r.section("workspace")
 	r.row("ambiente", s.Ambiente)
-	r.row("wsdl", s.WSDLURL)
+	r.row("modo", s.Modo)
+	switch {
+	case s.Modo == "nacional":
+		r.row("webservice", s.NacionalURL)
+	case s.EndpointURL != "":
+		r.row("SOAP", s.SOAPMode)
+		r.row("endpoint", s.EndpointURL)
+	default:
+		r.row("SOAP", s.SOAPMode)
+		r.row("wsdl", s.WSDLURL)
+	}
 	r.section("prestador")
 	r.row("razão social", s.RazaoSocial)
 	r.row("CNPJ", s.CNPJ)
@@ -42,6 +52,9 @@ func (r *humanRenderer) Status(s StatusInfo) error {
 	r.section("serviço")
 	r.row("série RPS", s.SerieRPS)
 	r.row("próximo nº RPS", strconv.Itoa(s.ProximoNumeroRPS))
+	if s.Modo == "nacional" {
+		r.row("próximo nº NFS-e", strconv.Itoa(s.ProximoNumeroNFSe))
+	}
 	r.row("alíquota ISS", strconv.FormatFloat(s.AliquotaISS, 'f', 2, 64)+"%")
 	r.row("código município", s.CodigoMunicipio)
 	auth := "—"
@@ -59,15 +72,27 @@ func (r *humanRenderer) Status(s StatusInfo) error {
 }
 
 func (r *humanRenderer) Emit(info EmitInfo) error {
+	nacional := info.Modo == "nacional"
 	if info.DryRun {
-		r.note("dry-run — sem chamada SOAP, sem incremento do contador")
+		r.note("dry-run — sem chamada ao webservice, sem incremento dos contadores")
 		r.row("RPS número", strconv.Itoa(info.NumeroRPS))
+		if nacional && info.NumeroNFSe != "" {
+			r.row("NFS-e número", info.NumeroNFSe)
+		}
 		r.emitVerbose(info)
 		return nil
 	}
 	if !info.Sucesso {
 		r.headlineErr("falha na emissão")
 		r.row("RPS número", strconv.Itoa(info.NumeroRPS))
+		if info.Protocolo != "" {
+			r.row("protocolo", info.Protocolo)
+			r.row("situação", info.StatusProc)
+			if nacional && info.NumeroNFSe != "" {
+				r.row("NFS-e número", info.NumeroNFSe)
+				r.note("o número da NFS-e foi consumido pela plataforma; o próximo envio usa o seguinte")
+			}
+		}
 		printMensagens(r.w, info.Mensagens)
 		r.emitVerbose(info)
 		return nil
@@ -78,14 +103,27 @@ func (r *humanRenderer) Emit(info EmitInfo) error {
 		r.headline("NFS-e emitida")
 	}
 	r.row("RPS número", strconv.Itoa(info.NumeroRPS))
+	if info.Protocolo != "" {
+		r.row("protocolo", info.Protocolo)
+	}
 	if info.NumeroNFSe != "" && (info.NFSe == nil || info.NFSe.Numero == "") {
 		r.row("NFS-e número", info.NumeroNFSe)
 	}
 	if info.NFSe != nil {
 		r.printNFSe(*info.NFSe)
 	}
+	if info.ChaveAcesso != "" && (info.NFSe == nil || info.NFSe.ChaveAcesso == "") {
+		r.row("chave de acesso", info.ChaveAcesso)
+	}
+	if info.LinkImpressao != "" {
+		r.row("impressão", info.LinkImpressao)
+	}
 	if info.Pendente {
-		r.note("solicitação recebida; confirmação da NFS-e ainda pendente")
+		if info.Protocolo != "" {
+			r.note("recebida pela prefeitura; confirme depois com: nfe query --protocolo " + info.Protocolo)
+		} else {
+			r.note("solicitação recebida; confirmação da NFS-e ainda pendente")
+		}
 	}
 	printMensagens(r.w, info.Mensagens)
 	r.emitVerbose(info)
@@ -97,6 +135,12 @@ func (r *humanRenderer) emitVerbose(info EmitInfo) {
 		return
 	}
 	printBlock(r.w, "XML assinado", info.SignedXML)
+	if info.Modo == "nacional" {
+		printBlock(r.w, "resposta da recepção", info.Response)
+		printBlock(r.w, "resposta da consulta", info.ConfirmXML)
+		printBlock(r.w, "XML da NFS-e", info.NFSeXML)
+		return
+	}
 	printBlock(r.w, "resposta SOAP", info.Response)
 	printBlock(r.w, "resposta consulta RPS", info.ConfirmXML)
 }
@@ -104,6 +148,26 @@ func (r *humanRenderer) emitVerbose(info EmitInfo) {
 func (r *humanRenderer) Query(info QueryInfo) error {
 	if !info.Sucesso {
 		r.headlineErr("falha na consulta")
+		if info.Protocolo != "" {
+			r.row("protocolo", info.Protocolo)
+			r.row("situação", info.StatusProc)
+		}
+		printMensagens(r.w, info.Mensagens)
+		return nil
+	}
+	if info.Protocolo != "" {
+		r.headline("consulta do protocolo")
+		r.row("protocolo", info.Protocolo)
+		r.row("situação", info.StatusProc)
+		for _, n := range info.NFSes {
+			r.printNFSe(n)
+		}
+		if info.LinkImpressao != "" {
+			r.row("impressão", info.LinkImpressao)
+		}
+		if len(info.NFSes) == 0 {
+			r.note("NFS-e ainda não disponível para este protocolo")
+		}
 		printMensagens(r.w, info.Mensagens)
 		return nil
 	}
@@ -179,11 +243,17 @@ func (r *humanRenderer) printNFSe(n QueriedNFSe) {
 	if n.CodigoVerificacao != "" {
 		r.row("cód. verificação", n.CodigoVerificacao)
 	}
+	if n.ChaveAcesso != "" {
+		r.row("chave de acesso", n.ChaveAcesso)
+	}
 	if n.DataEmissao != "" {
 		r.row("emissão", n.DataEmissao)
 	}
 	if n.ValorServicos != "" {
 		r.row("valor", n.ValorServicos)
+	}
+	if n.RazaoSocialTomador != "" {
+		r.row("tomador", n.RazaoSocialTomador)
 	}
 	if n.URL != "" {
 		r.row("URL", n.URL)

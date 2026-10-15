@@ -37,16 +37,25 @@ func (r *ResponsePayload) HasErrors() bool {
 func ParseResponse(bodyInner []byte) (*ResponsePayload, error) {
 	// Unwrap optional outer wrappers like <SomethingResposta><outputXML>...</outputXML></SomethingResposta>
 	raw := bytes.TrimSpace(bodyInner)
+	wrapped := false
 	if inner := extractInnerText(raw, "outputXML"); inner != nil {
 		raw = inner
+		wrapped = true
 	} else if inner := extractInnerText(raw, "return"); inner != nil {
 		raw = inner
+		wrapped = true
+	} else if inner := extractInnerText(raw, "result"); inner != nil {
+		raw = inner
+		wrapped = true
+	} else if inner := extractInnerText(raw, "xml"); inner != nil {
+		raw = inner
+		wrapped = true
 	}
 
 	// The wrapper's content is typically HTML-entity-encoded (the SOAP layer
 	// escaped < and > before sending). Decode if it looks encoded.
 	decoded := raw
-	if bytes.Contains(raw, []byte("&lt;")) || bytes.Contains(raw, []byte("&amp;")) {
+	if wrapped && (bytes.Contains(raw, []byte("&lt;")) || bytes.Contains(raw, []byte("&amp;"))) {
 		decoded = []byte(html.UnescapeString(string(raw)))
 	}
 

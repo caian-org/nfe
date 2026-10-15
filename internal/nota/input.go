@@ -19,6 +19,15 @@ type Input struct {
 	Servico     Servico `toml:"servico"`
 	CNBS        string  `toml:"cnbs,omitempty"`
 	Observacoes string  `toml:"observacoes,omitempty"`
+	IBSCBS      *IBSCBS `toml:"ibscbs,omitempty"`
+}
+
+// IBSCBS carries per-invoice overrides for the DPS IBSCBS group. Empty
+// fields fall back to the [ibscbs] section of config.toml.
+type IBSCBS struct {
+	CST                           string `toml:"cst,omitempty"`
+	CodigoClassificacaoTributaria string `toml:"codigo_classificacao_tributaria,omitempty"`
+	CodigoIndicadorOperacao       string `toml:"codigo_indicador_operacao,omitempty"`
 }
 
 type Tomador struct {
@@ -36,6 +45,7 @@ type Endereco struct {
 	Complemento     string `toml:"complemento,omitempty"`
 	Bairro          string `toml:"bairro"`
 	CodigoMunicipio string `toml:"codigo_municipio"`
+	Municipio       string `toml:"municipio,omitempty"`
 	UF              string `toml:"uf"`
 	CEP             string `toml:"cep"`
 }
@@ -47,9 +57,20 @@ type Servico struct {
 	CodigoCnae       string  `toml:"codigo_cnae,omitempty"`
 	IssRetido        bool    `toml:"iss_retido,omitempty"`
 	Aliquota         float64 `toml:"aliquota,omitempty"`
+	// CodigoTributacaoNacional is the DPS cTribNac (6 digits, e.g. "010101"
+	// for item 01.01 of LC 116). Required by the national layout.
+	CodigoTributacaoNacional string `toml:"codigo_tributacao_nacional,omitempty"`
+	// LocalPrestacao is the IBGE code of the município where the service was
+	// rendered (DPS cLocPrestacao). Defaults to the prestador's município.
+	LocalPrestacao string `toml:"local_prestacao,omitempty"`
 }
 
-var cNBSRegex = regexp.MustCompile(`^\d{9}$`)
+var (
+	cNBSRegex    = regexp.MustCompile(`^\d{9}$`)
+	digits3Regex = regexp.MustCompile(`^\d{3}$`)
+	digits6Regex = regexp.MustCompile(`^\d{6}$`)
+	digits7Regex = regexp.MustCompile(`^\d{7}$`)
+)
 
 // Load reads a TOML invoice input from path and validates the required fields.
 func Load(path string) (*Input, error) {
@@ -95,6 +116,23 @@ func Validate(in *Input) []string {
 	if in.CNBS != "" && !cNBSRegex.MatchString(in.CNBS) {
 		errs = append(errs, "código NBS (cnbs) deve conter exatamente 9 dígitos numéricos")
 	}
+	if v := in.Servico.CodigoTributacaoNacional; v != "" && !digits6Regex.MatchString(v) {
+		errs = append(errs, "código de tributação nacional (servico.codigo_tributacao_nacional) deve conter exatamente 6 dígitos numéricos")
+	}
+	if v := in.Servico.LocalPrestacao; v != "" && !digits7Regex.MatchString(v) {
+		errs = append(errs, "local da prestação (servico.local_prestacao) deve ser um código IBGE de 7 dígitos")
+	}
+	if i := in.IBSCBS; i != nil {
+		if i.CST != "" && !digits3Regex.MatchString(i.CST) {
+			errs = append(errs, "ibscbs.cst deve conter exatamente 3 dígitos numéricos")
+		}
+		if v := i.CodigoClassificacaoTributaria; v != "" && !digits6Regex.MatchString(v) {
+			errs = append(errs, "ibscbs.codigo_classificacao_tributaria deve conter exatamente 6 dígitos numéricos")
+		}
+		if v := i.CodigoIndicadorOperacao; v != "" && !digits6Regex.MatchString(v) {
+			errs = append(errs, "ibscbs.codigo_indicador_operacao deve conter exatamente 6 dígitos numéricos")
+		}
+	}
 
 	return errs
 }
@@ -114,17 +152,19 @@ func Example() *Input {
 				Complemento:     "",
 				Bairro:          "CENTRO",
 				CodigoMunicipio: "0000000",
+				Municipio:       "MUNICIPIO EXEMPLO",
 				UF:              "SP",
 				CEP:             "00000000",
 			},
 		},
 		Servico: Servico{
-			Discriminacao:    "DESCRIÇÃO DO SERVIÇO PRESTADO",
-			ValorServicos:    1000.0,
-			ItemListaServico: "0101",
-			CodigoCnae:       "6201500",
-			IssRetido:        false,
-			Aliquota:         5.0,
+			Discriminacao:            "DESCRIÇÃO DO SERVIÇO PRESTADO",
+			ValorServicos:            1000.0,
+			ItemListaServico:         "0101",
+			CodigoCnae:               "6201500",
+			IssRetido:                false,
+			Aliquota:                 5.0,
+			CodigoTributacaoNacional: "010101",
 		},
 		CNBS:        "115022000",
 		Observacoes: "Observações sobre o serviço prestado",

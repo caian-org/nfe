@@ -105,3 +105,8 @@ $RECYCLE.BIN/
 .devbox/
 bin/
 dist/
+
+# user workspace with live config and A1 certificate
+ws/
+*.pfx
+*.p12

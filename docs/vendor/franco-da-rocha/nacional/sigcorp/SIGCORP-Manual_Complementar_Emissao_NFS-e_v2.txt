@@ -1,0 +1,453 @@
+     MANUAL COMPLEMENTAR DE EMISSÃO DE NFS-e
+Emissão em tela — novos campos da Reforma Tributária (IBS e CBS) e do Layout Nacional
+
+
+
+
+                                    SIGCORP ISS
+                                                       SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+Item                  Informação
+
+Público               Contribuintes prestadores de serviço e seus contadores que emitem NFS-e em tela
+
+Vigência              A partir de 01/10/2026 — entrada em produção do Layout Nacional e
+                      obrigatoriedade do destaque de IBS e CBS
+
+Base normativa        EC nº 132/2023; LC nº 214/2025; LC nº 116/2003; Notas Técnicas da NFS-e
+                      Nacional nº 004, 007 e 008
+
+Complementa           Manual Complementar de Integração (Web Service) — versão 1.01, de 01/09/2026
+
+Versão deste manual   1.1 — 01/10/2026
+
+
+
+
+                                         Página 2
+                                                                       SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+1. Objetivo e contexto
+Este manual explica, campo a campo, as informações adicionais que passam a integrar a emissão de NFS-e
+em tela no SIGCORP ISS a partir de 1º de outubro de 2026, data em que entram em produção o Layout
+Nacional da NFS-e e a obrigatoriedade do destaque de IBS e CBS nas notas fiscais de serviço.
+Na emissão em tela, os campos exigidos pelo Layout Nacional já estão incorporados ao formulário — não há
+ajuste técnico a fazer pela empresa. O que muda para o usuário é o preenchimento de uma nova janela,
+acessada pelo botão Reforma Tributária, onde são informados os dados da operação para fins de IBS e CBS.
+Empresas que emitem via Web Service devem seguir o Manual Complementar de Integração, que trata os
+mesmos dados no XML da DPS.
+
+  Por que esses campos existem em 2026?
+  Em 2026 vigora o chamado ano-teste da Reforma Tributária: a CBS é destacada à alíquota de 0,9% e o IBS à
+  alíquota de 0,1% (art. 125 do ADCT, incluído pela EC nº 132/2023, e regras de transição da LC nº 214/2025).
+  O objetivo é calibrar o sistema e colher dados. O ISS continua sendo apurado e recolhido normalmente — os
+  campos de IBS/CBS não substituem os campos de ISS da nota.
+
+
+
+
+1.1 Resumo do que muda na tela
+ Elemento                              Mudança
+
+ Botão Reforma Tributária              Novo. Abre a janela “Reforma tributária | IBS e CBS”, com os dados da operação,
+                                       a classificação tributária e o cálculo automático de IBS/CBS.
+
+ Botão Pré Visualização NFSe           Novo. Permite a pré-visualização da nota
+
+ Demais campos da tela principal       Permanecem, com a função descrita na seção 2 — alguns passam a alimentar a
+                                       DPS do Layout Nacional.
+
+
+
+2. Tela principal de emissão
+A tela “Emissão de Nota Fiscal Eletrônica” traz, no cabeçalho, o CCM (cadastro mobiliário municipal) e a
+Razão Social do prestador logado. Os campos em cinza são preenchidos automaticamente a partir do
+cadastro e não podem ser editados na nota.
+
+
+
+
+                                                      Página 3
+                                                                           SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+                   Figura 1 — Tela de emissão de NFS-e (ambiente de testes — Contribuinte Teste SIGCORP).
+
+2.1 Dados do prestador e do tomador
+Campo                         O que é / o que informar                                 Atenção
+
+Regime do Prestador           Regime tributário do prestador, trazido do cadastro      Campo automático. Se o regime
+                              mobiliário. PLNF — Prestador Lançamento de Notas         estiver errado, corrija o cadastro
+                              Fiscais: regime normal de homologação do ISS, em         antes de emitir.
+                              que o prestador emite as notas e apura o imposto,
+                              sujeito à homologação pelo Fisco municipal.
+
+CPF/CNPJ Prestador            Documento do prestador, vindo do cadastro.               Automático.
+
+Tipo de Tomador               Natureza do tomador. Opções:                             Sem alteração com a Reforma —
+                              • Não identificado (PFNI)                                campo e opções permanecem os
+                              • Exportação                                             mesmos. Define quais dados do
+                                                                                       tomador serão exigidos.
+                              • Pessoa Física
+                              • Jurídica do Município
+                              • Jurídica de fora (do município)
+                              • Político
+
+CPF/CNPJ (Tom.)               Documento do tomador.                                    Ao informar o documento, a
+                                                                                       Razão/Nome é preenchida quando
+                                                                                       o tomador já estiver cadastrado.
+
+Razão / Nome (Tomador)        Nome ou razão social do tomador.                         Preenchido automaticamente.
+
+E-mail (Tomador)              E-mail para envio da NFS-e ao tomador.                   Recomendado. Confira a grafia — é
+                                                                                       por ele que o tomador recebe a
+                                                                                       nota.
+
+
+
+
+                                                          Página 4
+                                                                         SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+2.2 Dados do serviço
+Campo                        O que é / o que informar                                Atenção
+
+Atividade (lupa)             Código da atividade do prestador. Use a lupa para       A atividade escolhida define o item
+                             pesquisar entre as atividades vinculadas ao cadastro.   da lista da LC nº 116/2003 e a
+                                                                                     alíquota do ISS.
+
+Descrição da Atividade       Descrição do item da lista de serviços, preenchida      Automático. Base para a correlação
+Prestada (LC 116/2003)       automaticamente.                                        com a NBS na janela de IBS/CBS.
+
+% Aliq. Município            Alíquota do ISS aplicável à atividade.                  Automático. Não confundir com as
+                                                                                     alíquotas de IBS/CBS da janela
+                                                                                     Reforma Tributária.
+
+Data de Emissão              Data de geração da nota.                                —
+
+Data do Serviço              Data de competência (prestação) do serviço.             Define o período de apuração. Deve
+                                                                                     ser coerente com a data efetiva da
+                                                                                     prestação.
+
+Valor Total da Nota (R$)     Valor bruto do serviço.                                 É a base sobre a qual o sistema
+                                                                                     calcula ISS, IBS e CBS (antes de
+                                                                                     descontos e deduções aplicáveis).
+
+Situação de Tributação (LC   Situação do ISS na operação. Opções:                    Sem alteração com a Reforma —
+116/2003)                    • Tributado no Prestador — ISS devido ao município      campo e opções permanecem os
+                             e recolhido pelo prestador;                             mesmos. Refere-se apenas ao ISS; a
+                             • Tributado no Tomador — ISS devido ao município        situação de IBS/CBS é informada à
+                             e retido pelo tomador (responsável tributário);         parte, pelo CST/cClassTrib (seção 3).
+                             • Não tributada no município – Não Retido — ISS
+                             devido a outro município, sem retenção;
+                             • Não tributada no município – Retido — ISS devido
+                             a outro município, com retenção pelo tomador;
+                             • Não incidência;
+                             • Imune;
+                             • Isento.
+
+Descrição do Serviço         Texto livre descrevendo o serviço efetivamente          Seja específico: período, contrato,
+Prestado                     prestado.                                               medição etc. Ajuda na conferência
+                                                                                     da NBS e da classificação tributária.
+
+
+
+2.3 Retenções e deduções
+Campo                        O que é / o que informar                                Atenção
+
+Desc. Incondicionado         Desconto concedido sem condição (já na emissão).        Em regra, reduz a base de cálculo
+                                                                                     dos tributos.
+
+Desc. Condicionado           Desconto sujeito a evento futuro (ex.: pagamento        Em regra, não reduz a base de
+                             antecipado).                                            cálculo.
+
+Val. Aprox. Tributos         Valor aproximado da carga tributária, para              Informativo.
+                             informação ao consumidor (Lei nº 12.741/2012).
+
+
+
+
+                                                         Página 5
+                                                                            SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+3. Janela “Reforma tributária | IBS e CBS”
+Acessada pelo botão Reforma Tributária da tela principal, esta janela concentra os dados exigidos pelo
+Layout Nacional para o destaque de IBS e CBS. O preenchimento segue cinco etapas, numeradas na figura
+abaixo.
+
+
+
+
+                             Figura 2 — Janela de IBS e CBS com as cinco etapas de preenchimento.
+
+ Etapa          Bloco                                 Resumo
+
+ 1              Informações Gerais                    Município de Prestação do Serviço e NBS.
+
+ 2              Classificação da operação             Código Indicador da Operação, cClassTrib e tipo de operação com
+                                                      entes governamentais/imóveis.
+
+ 3              Campos condicionais                   Bens imóveis/serviços médicos e fornecimento próprio de bens
+                                                      materiais — só quando aplicável.
+
+ 4              Valores calculados                    Conferência das alíquotas de IBS, CBS e reduções, preenchidas pelo
+                                                      sistema.
+
+ 5              Revisão e salvamento                  Conferir tudo e clicar em Salvar.
+
+
+
+     Ordem de preenchimento importa
+     Os campos são encadeados: o Código Indicador da Operação só é liberado após a escolha da NBS (“Selecione NBS
+     para prosseguir”), e o Código de Classificação Tributária só após o Código Indicador da Operação. Preencha na
+     ordem 1 → 2 → 3 → 4 → 5.
+
+
+
+
+                                                           Página 6
+                                                                            SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+3.1 Etapa 1 — Informações Gerais
+ Campo                        O que é / o que informar                                  Atenção
+
+ Município de Prestação do    Município onde o serviço é considerado prestado.          Para o ISS, segue a LC nº 116/2003.
+ Serviço                      Digite parte do nome para pesquisar.                      Para IBS/CBS, o local da operação
+                                                                                        segue as regras próprias da LC nº
+                                                                                        214/2025 — por isso o sistema
+                                                                                        pede o Código Indicador da
+                                                                                        Operação na etapa 2.
+
+ NBS                          Código da Nomenclatura Brasileira de Serviços,            Campo obrigatório no Layout
+                              Intangíveis e outras Operações que Produzam               Nacional. A lista exibida é filtrada a
+                              Variações no Patrimônio correspondente ao serviço.        partir do item da LC nº 116/2003 da
+                                                                                        atividade. Escolha o código que
+                                                                                        melhor descreve o serviço
+                                                                                        efetivamente prestado; em caso de
+                                                                                        dúvida, consulte o contador.
+
+
+3.2 Etapa 2 — Classificação da operação
+ Campo                        O que é / o que informar                                  Atenção
+
+ Código Indicador da          Indica a natureza da operação para fins de definição      Mensagem “Selecione NBS para
+ Operação (cIndOp)            do local de incidência do IBS/CBS. As opções              prosseguir”: volte à etapa 1 e
+                              dependem da NBS escolhida (tabela de correlação           escolha a NBS. Veja a relação
+                              item LC 116 × NBS × cIndOp do Layout Nacional).           completa aqui.
+
+ Código de Classificação      Código de 6 dígitos da tabela oficial de classificação    Depende do Código Indicador da
+ Tributária do IBS e da CBS   tributária. Os 3 primeiros dígitos correspondem ao        Operação. É o campo que
+ (cClassTrib)                 CST do IBS/CBS. Exemplos de grupos: 000 —                 determina se haverá redução de
+                              tributação integral; 200 — alíquota reduzida; 410 —       alíquota, isenção, imunidade etc. —
+                              imunidade e não incidência.                               e, portanto, os valores calculados
+                                                                                        na etapa 4. Use a tabela oficial
+                                                                                        vigente.
+
+ Tipo de operação com         Informa a relação temporal entre fornecimento e           Preencher somente com orientação
+ Entes Governamentais ou      pagamento nas operações com entes                         do CONTADOR. Nesses casos, a LC
+ outros serviços sobre bens   governamentais e em determinados serviços sobre           nº 214/2025 tem regras específicas
+ imóveis                      bens imóveis. Opções:                                     sobre o momento de incidência.
+                              1 – Fornecimento com pagamento posterior;                 Quando não se aplicar, deixe
+                              2 – Recebimento do pagamento com fornecimento já          “Selecione”.
+                              realizado;
+                              3 – Fornecimento com pagamento já realizado;
+                              4 – Recebimento do pagamento com fornecimento
+                              posterior;
+                              5 – Fornecimento e recebimento do pagamento
+                              concomitantes.
+
+
+3.3 Etapa 3 — Campos condicionais
+Os dois campos abaixo vêm zerados e, como indica a própria tela, devem ser preenchidos somente quando
+aplicáveis e conforme orientação do contador.
+
+
+
+
+                                                          Página 7
+                                                                            SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+ Campo                        O que é / o que informar                                  Atenção
+
+ Operações com bens           Valor (R$) relativo a operações com bens imóveis ou       Preenchimento somente quando
+ imóveis, e serviços          serviços médicos que recebem tratamento específico        aplicável (e conforme orientação
+ médicos                      na base de cálculo do IBS/CBS. O ícone de                 do seu contador). Nos demais
+                              informação (ⓘ) ao lado do campo traz orientações.         casos, deixe 0,00.
+
+ Fornecimento próprio de      Valor (R$) dos materiais fornecidos pelo próprio          Preenchimento somente quando
+ bens materiais               prestador e incluídos no preço do serviço (situação       aplicável (e conforme orientação
+                              típica de construção civil e serviços congêneres).        do seu contador). Nos demais
+                                                                                        casos, deixe 0,00.
+
+
+3.4 Etapa 4 — Valores calculados automaticamente
+Concluídas as etapas anteriores, o sistema preenche os blocos IBS, CBS e Redução de Alíquota. Esses campos
+ficam em cinza e não são editáveis — servem para conferência.
+
+ Campo                        O que é / o que informar                                  Atenção
+
+ Alíquota IBS Estadual        Alíquota da parcela estadual do IBS.                      Em 2026: 0,1%.
+
+ Alíquota IBS Municipal       Alíquota da parcela municipal do IBS.                     Em 2026: 0,00%.
+
+ Alíquota efetiva IBS         Alíquota após eventual redução prevista no                Igual à alíquota cheia quando não
+ Estadual / Municipal         cClassTrib.                                               há redução.
+
+ Alíquota CBS                 Alíquota da Contribuição sobre Bens e Serviços.           Em 2026: 0,9%.
+
+ Alíquota efetiva CBS         Alíquota da CBS após eventual redução.                    —
+
+ Redução Alíquota IBS / CBS   Percentual de redução aplicável à operação,               Se a redução esperada não
+ (%)                          conforme a classificação tributária (ex.: reduções de     aparecer, revise a NBS, o Código
+                              30% ou 60% previstas na LC nº 214/2025 para               Indicador da Operação e o
+                              determinados serviços).                                   cClassTrib — o sistema calcula a
+                                                                                        partir deles.
+
+
+
+  Exemplo numérico (ilustrativo, sem redução)
+  Valor do serviço: R$ 10.000,00 · cClassTrib do grupo 000 (tributação integral).
+  IBS Estadual: 0,1% → R$ 10,00 · IBS Municipal: 0,00% → R$ 0,00 · CBS: 0,9% → R$ 90,00.
+  Total destacado de IBS/CBS: R$ 100,00 — informação de ano-teste, que não altera o ISS da nota.
+
+
+3.5 Tributos Federais e Valores Autodeclarados
+Na mesma janela permanecem os campos dos tributos federais já existentes, agora estruturados conforme
+a Nota Técnica nº 007 (PIS/COFINS).
+
+ Campo                        O que é / o que informar                                  Atenção
+
+ Alíquota PIS / Alíquota      Alíquotas de PIS e COFINS incidentes sobre a              Preenchimento somente quando
+ COFINS (%)                   operação, quando informadas na nota.                      aplicável (e conforme orientação
+                                                                                        do seu contador).
+
+ Demais tributos federais /   Valores de tributos federais e da contribuição            Preenchimento somente quando
+ Valor INSS                   previdenciária relativos à nota, inclusive retenções.     aplicável (e conforme orientação
+                                                                                        do seu contador).
+
+
+
+                                                          Página 8
+                                                                          SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+ Campo                       O que é / o que informar                                 Atenção
+
+ Opções de retenção          Indica se há retenção de tributos federais pelo          Preenchimento somente quando
+                             tomador e quais.                                         aplicável (e conforme orientação
+                                                                                      do seu contador).
+
+ Alíquota PIS / COFINS       Alíquotas de PIS e COFINS declaradas pelo próprio        Preenchimento somente quando
+ Autodeclarado (%)           emitente, quando diferentes das preenchidas pelo         aplicável (e conforme orientação
+                             sistema. Há um ícone ⓘ com orientações.                  do seu contador). Nos demais
+                                                                                      casos, deixe 0,00.
+
+
+3.6 Etapa 5 — Revisar e salvar
+  1. Confira o Município de Prestação e a NBS.
+  2. Confira se o Código Indicador da Operação e o cClassTrib correspondem à natureza do serviço.
+  3. Verifique se os campos condicionais (etapa 3) estão zerados, quando não se aplicarem.
+  4. Confira as alíquotas e reduções calculadas (etapa 4).
+  5. Clique em Salvar. A janela fecha e os dados passam a integrar a nota em edição.
+
+
+4. Pré-visualização
+Antes de emitir, use o botão Pré Visualização NFSe para conferir os dados. A pré-visualização mostra a nota
+como será impressa, inclusive o novo bloco de IBS e CBS, sem gerar documento fiscal válido.
+  • Se algum valor estiver incorreto, volte à janela Reforma Tributária, ajuste e salve novamente.
+
+
+5. Passo a passo resumido
+  1. Preencha tomador, atividade, datas, valor e situação de tributação do ISS na tela principal.
+  2. Clique em Reforma Tributária.
+  3. Informe o Município de Prestação do Serviço e a NBS.
+  4. Selecione o Código Indicador da Operação e o Código de Classificação Tributária (cClassTrib).
+  5. Se o tomador for ente governamental ou a operação envolver imóveis, informe o Tipo de operação.
+  6. Preencha os campos condicionais somente se aplicáveis, conforme orientação do contador.
+  7. Confira os valores calculados de IBS, CBS e redução; revise os tributos federais.
+  8. Clique em Salvar, use a Pré Visualização NFSe e, estando tudo correto, emita a nota.
+
+
+6. Dúvidas frequentes e erros comuns
+ Situação                                     O que fazer
+
+ Código Indicador da Operação aparece         Selecione primeiro a NBS na etapa 1.
+ “Selecione NBS para prosseguir”
+
+ A NBS desejada não aparece na lista          Verifique se a Atividade da tela principal é a correta — a lista de NBS é
+                                              filtrada a partir do item da LC nº 116/2003.
+
+ A redução de alíquota esperada não foi       Revise o cClassTrib: é ele que define a redução. Confirme o código com o
+ aplicada                                     contador.
+
+
+                                                         Página 9
+                                                                       SIGCORP ISS · Manual Complementar de Emissão de NFS-e
+
+
+
+
+ Situação                                  O que fazer
+
+ Os valores de IBS/CBS ficaram zerados     Verifique se o cClassTrib indica imunidade, isenção ou não incidência, e se
+                                           o Valor Total da Nota foi informado.
+
+ O destaque de IBS/CBS aumenta o valor a   Não. Em 2026 os valores de IBS e CBS são destacados em caráter de teste e
+ pagar de ISS?                             não alteram a apuração do ISS.
+
+ Emito via Web Service. Este manual se     Os conceitos são os mesmos, mas o envio segue o Manual Complementar
+ aplica?                                   de Integração (DPS no padrão ADN, grupo IBSCBS do XML).
+
+
+
+7. Referência para integração via Web Service
+Para empresas que emitem via Web Service, os dados desta janela correspondem a informações da DPS no
+padrão do Ambiente de Dados Nacional (ADN). Referência indicativa — confirme sempre no leiaute vigente:
+
+ Campo em tela                                       Informação no Layout Nacional
+
+ Município de Prestação do Serviço                   Local da prestação do serviço (código IBGE)
+
+ NBS                                                 cNBS — código NBS do serviço
+
+ Código Indicador da Operação                        cIndOp — grupo IBSCBS
+
+ Código de Classificação Tributária                  CST e cClassTrib — grupo IBSCBS
+
+ Alíquotas e reduções de IBS/CBS                     Grupo de valores do IBSCBS
+
+
+
+  • Produção: webservice.meumunicipio.online
+  • QA: qa.webservice.meumunicipio.online
+  • Dev: dev.webservice.meumunicipio.online
+  • Manual Complementar de Integração: sigcorp.com.br/manual-complementar-de-integracao-nfs-e/
+  • Documentação técnica oficial: gov.br/nfse — Biblioteca de Documentação Técnica
+
+
+
+
+                                                     Página 10
+

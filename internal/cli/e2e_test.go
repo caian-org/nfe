@@ -14,11 +14,11 @@ import (
 
 // TestEndToEndDryRunMatchesGolden exercises the full pipeline a real `nfe emit
 // --dry-run` invocation would take: load a TOML config, load a TOML invoice
-// input, build the RPS, marshal it to XML. The resulting XML must contain the
-// landmarks documented elsewhere (xmlns, RPS Id, currency formatting). We
-// don't compare against the package's XML golden here because the CLI uses a
-// non-deterministic DataEmissao (today). That deterministic check lives in
-// internal/abrasf — this test guarantees the CLI plumbing reaches it.
+// input, build the DPS, marshal it to XML. `nfe init` scaffolds the national
+// (SIGCORP) mode, so the landmarks are those of the DPS layout. We don't
+// compare against the package golden here because the CLI uses a
+// non-deterministic dhEmi (now). That deterministic check lives in
+// internal/dps — this test guarantees the CLI plumbing reaches it.
 func TestEndToEndDryRunMatchesGolden(t *testing.T) {
 	dir := t.TempDir()
 
@@ -37,10 +37,12 @@ func TestEndToEndDryRunMatchesGolden(t *testing.T) {
 
 	var resp struct {
 		Emit struct {
-			DryRun    bool   `json:"dry_run"`
-			Sucesso   bool   `json:"sucesso"`
-			NumeroRPS int    `json:"numero_rps"`
-			SignedXML string `json:"signed_xml"`
+			DryRun     bool   `json:"dry_run"`
+			Sucesso    bool   `json:"sucesso"`
+			Modo       string `json:"modo"`
+			NumeroRPS  int    `json:"numero_rps"`
+			NumeroNFSe string `json:"numero_nfse"`
+			SignedXML  string `json:"signed_xml"`
 		} `json:"emit"`
 		Event string `json:"event"`
 	}
@@ -48,23 +50,27 @@ func TestEndToEndDryRunMatchesGolden(t *testing.T) {
 	assert.Equal(t, "emit", resp.Event)
 	assert.True(t, resp.Emit.DryRun)
 	assert.True(t, resp.Emit.Sucesso)
-	assert.Equal(t, 1, resp.Emit.NumeroRPS, "first emission must use RPS number 1")
+	assert.Equal(t, "nacional", resp.Emit.Modo)
+	assert.Equal(t, 1, resp.Emit.NumeroRPS, "first emission must use DPS number 1")
+	assert.Equal(t, "1", resp.Emit.NumeroNFSe, "first emission must use NFS-e number 1")
 
-	// 3. Verify the XML has all the landmarks the WS expects.
+	// 3. Verify the XML has all the landmarks the national webservice expects.
 	xmlStr := resp.Emit.SignedXML
-	assert.Contains(t, xmlStr, `xmlns="http://www.abrasf.org.br/nfse.xsd"`)
-	assert.Contains(t, xmlStr, `<InfDeclaracaoPrestacaoServico Id="rps1">`)
-	assert.Contains(t, xmlStr, `<ValorServicos>1000.00</ValorServicos>`)
-	assert.Contains(t, xmlStr, `<Aliquota>5.0</Aliquota>`)
-	assert.Contains(t, xmlStr, `<Cnpj>00000000000000</Cnpj>`) // tomador CNPJ from example
-	assert.Contains(t, xmlStr, `<ItemListaServico>0101</ItemListaServico>`)
+	assert.Contains(t, xmlStr, `<DPS xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.01">`)
+	assert.Contains(t, xmlStr, `<infDPS Id="DPS000000020000000000000000001000000000000001">`)
+	assert.Contains(t, xmlStr, `<vServ>1000.00</vServ>`)
+	assert.Contains(t, xmlStr, `<cTribNac>010101</cTribNac>`)
+	assert.Contains(t, xmlStr, `<cNBS>115022000</cNBS>`)
+	assert.Contains(t, xmlStr, `<toma><CNPJ>00000000000000</CNPJ>`) // tomador CNPJ from example
+	assert.Contains(t, xmlStr, `<IBSCBS><finNFSe>0</finNFSe><cIndOp>100301</cIndOp>`)
 	assert.NotContains(t, xmlStr, `✅`, "must not contain emojis")
 	assert.NotContains(t, xmlStr, `❌`, "must not contain emojis")
 
-	// 4. Confirm the RPS counter on disk was NOT bumped by dry-run.
+	// 4. Confirm the counters on disk were NOT bumped by dry-run.
 	reloaded, err := config.Load(cfgPath)
 	require.NoError(t, err)
 	assert.Equal(t, 1, reloaded.Configuracoes.ProximoNumeroRPS)
+	assert.Equal(t, 1, reloaded.Configuracoes.ProximoNumeroNFSe)
 
 	// 5. The notas/example.toml that init wrote must round-trip cleanly: a
 	// fresh `os.ReadFile` returns the same content nota.Load already parsed.

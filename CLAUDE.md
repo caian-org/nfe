@@ -41,17 +41,18 @@ Command surface:
 - `./bin/nfe -c <path>/config.toml status` — show config summary.
 - `./bin/nfe -c <path>/config.toml env homologacao|producao` — switch the
   active environment.
-- `./bin/nfe -c <path>/config.toml query --numero N` or
-  `--data-inicial AAAA-MM-DD --data-final AAAA-MM-DD` — read-only NFS-e
-  lookup.
+- `./bin/nfe -c <path>/config.toml query --protocolo P` (national) or
+  `--numero N` / `--data-inicial AAAA-MM-DD --data-final AAAA-MM-DD`
+  (ABRASF) — read-only NFS-e lookup.
 - `./bin/nfe -c <path>/config.toml emit input.toml` — emit a new NFS-e
   (write operation: never run against real `ws/`).
 - `./bin/nfe -c <path>/config.toml cancel --numero N --codigo C` — cancel
-  an authorized NFS-e (write operation).
+  an authorized NFS-e (ABRASF only; write operation).
 
 Skills (canonical, read from `.codex/skills/`):
 
 - `.codex/skills/nf-dev-workflow/SKILL.md`
+- `.codex/skills/nf-dps-nacional/SKILL.md`
 - `.codex/skills/nf-abrasf-xml/SKILL.md`
 - `.codex/skills/nf-xmldsig/SKILL.md`
 - `.codex/skills/nf-soap-wsdl/SKILL.md`
@@ -60,7 +61,7 @@ Skills (canonical, read from `.codex/skills/`):
 Subagents (`.claude/agents/<name>.md` and `.codex/agents/<name>.toml`):
 
 - `nf-architect` — cross-package design questions across
-  `internal/{abrasf,xmlsig,soap,service}`.
+  `internal/{dps,sigcorp,abrasf,xmlsig,soap,service}`.
 - `nf-abrasf-xml-reviewer` — XML structure and signature placement audit.
 - `nf-test-runner` — runs `just test-race` / `just cover` and reports.
 - `nf-pt-br-translator` — pt-BR voice and consistency audit across

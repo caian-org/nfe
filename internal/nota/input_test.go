@@ -72,6 +72,26 @@ func TestValidate(t *testing.T) {
 			fix:  func(in *nota.Input) { in.CNBS = "1234" },
 			want: "9 dígitos numéricos",
 		},
+		{
+			name: "cTribNac wrong length",
+			fix:  func(in *nota.Input) { in.Servico.CodigoTributacaoNacional = "0101" },
+			want: "codigo_tributacao_nacional",
+		},
+		{
+			name: "local prestacao not IBGE",
+			fix:  func(in *nota.Input) { in.Servico.LocalPrestacao = "SP" },
+			want: "local_prestacao",
+		},
+		{
+			name: "ibscbs override bad cst",
+			fix:  func(in *nota.Input) { in.IBSCBS = &nota.IBSCBS{CST: "00"} },
+			want: "ibscbs.cst",
+		},
+		{
+			name: "ibscbs override bad cIndOp",
+			fix:  func(in *nota.Input) { in.IBSCBS = &nota.IBSCBS{CodigoIndicadorOperacao: "abc"} },
+			want: "ibscbs.codigo_indicador_operacao",
+		},
 	}
 
 	for _, tc := range tests {
@@ -92,6 +112,16 @@ func TestValidate(t *testing.T) {
 func TestExamplePassesValidation(t *testing.T) {
 	errs := nota.Validate(nota.Example())
 	require.Empty(t, errs)
+	assert.Equal(t, "010101", nota.Example().Servico.CodigoTributacaoNacional)
+	assert.Equal(t, "115022000", nota.Example().CNBS)
+}
+
+func TestIBSCBSOverridesAreOptional(t *testing.T) {
+	in := nota.Example()
+	in.IBSCBS = &nota.IBSCBS{}
+	require.Empty(t, nota.Validate(in))
+	in.IBSCBS = &nota.IBSCBS{CST: "200", CodigoClassificacaoTributaria: "200001", CodigoIndicadorOperacao: "100301"}
+	require.Empty(t, nota.Validate(in))
 }
 
 func TestCPFOnlyTomadorPasses(t *testing.T) {

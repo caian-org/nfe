@@ -5,8 +5,11 @@ description: ABRASF v2.04 XML emission rules for nf. Use when changing builders,
 
 # Nf ABRASF XML
 
-Use this skill before touching anything in `internal/abrasf/` or under
-`testdata/golden/`.
+Use this skill before touching anything in `internal/abrasf/` or the
+`gerar_nfse_*`, `consultar_*` and `cancelar_*` goldens under
+`testdata/golden/`. This is the SOAP/ABRASF path used when the config has no
+`[nacional]` section; Franco da Rocha now uses the national DPS path
+(`nf-dps-nacional`).
 
 ## Wire format contract
 

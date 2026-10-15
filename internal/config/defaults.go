@@ -1,14 +1,16 @@
 package config
 
-// Default returns the seed configuration written by `nfe init`. All values are
-// obvious placeholders — the user is expected to edit them before pointing
-// the CLI at a real ABRASF web service.
+// Default returns the seed configuration written by `nfe init`. Prestador
+// values are obvious placeholders; [nacional] points at the SIGCORP WS Padrão
+// Nacional hosts and [ibscbs] carries the 2026 test-year rates.
 func Default() *Config {
+	ibsUF, ibsMun, cbs := 0.1, 0.0, 0.9
 	return &Config{
 		Ambiente: EnvHomologacao,
 		SOAP: SOAP{
-			WSDLHomologacao: "https://teste.exemplo.com.br/abrasf/ws/nfs?wsdl",
-			WSDLProducao:    "https://producao.exemplo.com.br/abrasf/ws/nfs?wsdl",
+			WSDLHomologacao:  "https://teste.exemplo.com.br/abrasf/ws/nfs?wsdl",
+			WSDLProducao:     "https://producao.exemplo.com.br/abrasf/ws/nfs?wsdl",
+			SOAPActionPrefix: DefaultSOAPActionPrefix,
 		},
 		Prestador: Prestador{
 			CNPJ:               "00000000000000",
@@ -34,12 +36,29 @@ func Default() *Config {
 			Senha:   "senha",
 		},
 		Configuracoes: Configuracoes{
-			SerieRPS:         "A",
-			ProximoNumeroRPS: 1,
-			CodigoMunicipio:  "0000000",
-			AliquotaISS:      5.0,
-			ConfirmTimeout:   DefaultConfirmTimeout,
-			ConfirmInterval:  DefaultConfirmInterval,
+			SerieRPS:          "A",
+			ProximoNumeroRPS:  1,
+			CodigoMunicipio:   "0000000",
+			AliquotaISS:       5.0,
+			ConfirmTimeout:    DefaultConfirmTimeout,
+			ConfirmInterval:   DefaultConfirmInterval,
+			ProximoNumeroNFSe: 1,
+		},
+		Nacional: &Nacional{
+			URLProducao:     DefaultNacionalURLProducao,
+			URLHomologacao:  DefaultNacionalURLHomologacao,
+			SerieDPS:        DefaultSerieDPS,
+			VersaoAplicacao: DefaultVersaoAplicacao,
+			OpSimpNac:       OpSimpNacNaoOptante,
+			RegEspTrib:      0,
+		},
+		IBSCBS: &IBSCBS{
+			CST:                           "000",
+			CodigoClassificacaoTributaria: "000001",
+			CodigoIndicadorOperacao:       "100301",
+			AliquotaIBSUF:                 &ibsUF,
+			AliquotaIBSMunicipal:          &ibsMun,
+			AliquotaCBS:                   &cbs,
 		},
 	}
 }

@@ -47,6 +47,19 @@ func TestParseResponseUnwrapsReturn(t *testing.T) {
 	assert.True(t, resp.HasErrors())
 }
 
+func TestParseResponseUnwrapsResultAndXML(t *testing.T) {
+	for _, tag := range []string{"result", "xml"} {
+		t.Run(tag, func(t *testing.T) {
+			body := []byte(`<resp><` + tag + `>&lt;ListaMensagemRetorno&gt;&lt;MensagemRetorno&gt;&lt;Codigo&gt;X&lt;/Codigo&gt;&lt;Mensagem&gt;y&lt;/Mensagem&gt;&lt;/MensagemRetorno&gt;&lt;/ListaMensagemRetorno&gt;</` + tag + `></resp>`)
+			resp, err := abrasf.ParseResponse(body)
+			require.NoError(t, err)
+			assert.True(t, resp.HasErrors())
+			require.Len(t, resp.Mensagens, 1)
+			assert.Equal(t, "X", resp.Mensagens[0].Codigo)
+		})
+	}
+}
+
 func TestParseResponseSuccess(t *testing.T) {
 	body := []byte(`<GerarNfseResposta xmlns="http://www.abrasf.org.br/nfse.xsd">
   <ListaNfse>

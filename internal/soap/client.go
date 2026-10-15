@@ -153,7 +153,7 @@ func (c *Client) Call(ctx context.Context, action string, dados []byte) ([]byte,
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("soap: requisição: %w", err)
+		return nil, classifyTransportErr("soap: requisição", c.endpoint, err)
 	}
 	defer resp.Body.Close()
 
@@ -162,6 +162,10 @@ func (c *Client) Call(ctx context.Context, action string, dados []byte) ([]byte,
 		return nil, fmt.Errorf("soap: ler resposta: %w", err)
 	}
 
+	// Gateway errors mean the municipal upstream is gone, not a SOAP fault.
+	if isGatewayStatus(resp.StatusCode) {
+		return body, &UnavailableError{URL: c.endpoint, Status: resp.StatusCode}
+	}
 	// SOAP faults arrive with a 5xx status and a SOAP-Fault body; surface both.
 	if resp.StatusCode >= 400 {
 		return body, fmt.Errorf("soap: servidor retornou HTTP %d", resp.StatusCode)

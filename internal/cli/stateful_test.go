@@ -80,6 +80,7 @@ func fakeABRASFByAction(t *testing.T, responses map[string]string) *httptest.Ser
 func workspaceWith(t *testing.T, srv *httptest.Server) string {
 	t.Helper()
 	cfg := config.Default()
+	cfg.Nacional = nil // these fixtures exercise the ABRASF/SOAP path
 	cfg.Autenticacao.Usuario = "u"
 	cfg.Autenticacao.Senha = "p"
 	cfg.SOAP.WSDLHomologacao = srv.URL + "?wsdl"
@@ -134,6 +135,7 @@ func soapEnvelope(body string) string {
 func TestEmitDryRunNoNetwork(t *testing.T) {
 	// Point at a URL that would refuse if dialed.
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
@@ -156,6 +158,7 @@ func TestEmitDryRunNoNetwork(t *testing.T) {
 
 func TestEmitDryRunProgressGoesToStderr(t *testing.T) {
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
@@ -176,6 +179,7 @@ func TestEmitDryRunProgressGoesToStderr(t *testing.T) {
 
 func TestEmitDryRunJSONDoesNotRenderProgress(t *testing.T) {
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
@@ -194,6 +198,7 @@ func TestEmitDryRunJSONDoesNotRenderProgress(t *testing.T) {
 
 func TestEmitDryRunVerboseRendersSignedXML(t *testing.T) {
 	cfg := config.Default()
+	cfg.Nacional = nil
 	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1"
 	cfg.SOAP.WSDLProducao = "http://127.0.0.1:1"
 	cfg.Autenticacao.Usuario = "u"
@@ -214,7 +219,7 @@ func TestEmitSuccessBumpsCounterOnDisk(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID)
 	require.NoError(t, err)
 	assert.Contains(t, out, "NFS-e emitida")
@@ -232,7 +237,7 @@ func TestEmitVerboseRendersSOAPResponse(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--verbose")
 	require.NoError(t, err)
 	assert.Contains(t, out, "XML assinado:")
@@ -248,7 +253,7 @@ func TestEmitPollsRPSConfirmationWhenResponseIsAsync(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--verbose")
 	require.NoError(t, err)
 	assert.Contains(t, out, "NFS-e emitida")
@@ -267,7 +272,7 @@ func TestEmitKeepsPendingWhenRPSConfirmationHasOnlySituacao(t *testing.T) {
 
 	workspace := workspaceWith(t, srv)
 	setConfirmationDurations(t, workspace, "20ms", "1ms")
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID)
 	require.NoError(t, err)
 	assert.Contains(t, out, "solicitação de NFS-e enviada")
@@ -283,7 +288,7 @@ func TestEmitNoConfirmationWaitSkipsRPSPolling(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID, "--no-confirmation-wait")
 	require.NoError(t, err)
 	assert.Contains(t, out, "solicitação recebida; confirmação da NFS-e ainda pendente")
@@ -295,7 +300,7 @@ func TestEmitErrorsLeaveCounterAlone(t *testing.T) {
 	defer srv.Close()
 
 	workspace := workspaceWith(t, srv)
-	notaID := notaFile(t, workspace, "mova")
+	notaID := notaFile(t, workspace, "exemplo")
 	out, err := runCmd(t, "-w", workspace, "emit", notaID)
 	require.NoError(t, err, "WS rejection must NOT surface as a CLI error; the renderer handles it")
 	assert.Contains(t, out, "falha na emissão")
@@ -319,6 +324,56 @@ func TestQueryByNumeroRendersTable(t *testing.T) {
 	assert.Contains(t, out, "42")
 	assert.Contains(t, out, "ABC")
 	assert.Contains(t, out, "ACME")
+}
+
+func TestQueryUsesConfiguredEndpointWhenWSDLIsUnavailable(t *testing.T) {
+	srv := fakeABRASF(t, soapEnvelope(`<ConsultarNfseResposta><ListaNfse><CompNfse><Nfse><InfNfse><Numero>42</Numero><CodigoVerificacao>ABC</CodigoVerificacao><DataEmissao>2026-05-01T10:00:00-03:00</DataEmissao></InfNfse></Nfse></CompNfse></ListaNfse></ConsultarNfseResposta>`))
+	defer srv.Close()
+
+	cfg := config.Default()
+	cfg.Nacional = nil
+	cfg.Autenticacao.Usuario = "u"
+	cfg.Autenticacao.Senha = "p"
+	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1/unavailable?wsdl"
+	cfg.SOAP.EndpointHomologacao = srv.URL + "/svc"
+	workspace := t.TempDir()
+	require.NoError(t, config.Save(filepath.Join(workspace, "config.toml"), cfg))
+
+	out, err := runCmd(t, "-w", workspace, "query", "-n", "42")
+	require.NoError(t, err)
+	assert.Contains(t, out, "42")
+	assert.Contains(t, out, "ABC")
+}
+
+func TestQueryParsesProviderLinkAliases(t *testing.T) {
+	cases := []struct {
+		name string
+		tag  string
+		url  string
+	}{
+		{name: "LinkNota", tag: "LinkNota", url: "https://example.test/nfse?id=42&amp;print=1"},
+		{name: "LinkImpressao", tag: "LinkImpressao", url: "https://example.test/impressao?id=42&amp;print=1"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body := `<ConsultarNfseResposta><ListaNfse><CompNfse><Nfse><InfNfse><Numero>42</Numero><CodigoVerificacao>ABC</CodigoVerificacao><DataEmissao>2026-05-01T10:00:00-03:00</DataEmissao><` + tc.tag + `>` + tc.url + `</` + tc.tag + `><DeclaracaoPrestacaoServico><InfDeclaracaoPrestacaoServico><Servico><Valores><ValorServicos>1500.00</ValorServicos></Valores></Servico><TomadorServico><RazaoSocial>ACME</RazaoSocial></TomadorServico></InfDeclaracaoPrestacaoServico></DeclaracaoPrestacaoServico></InfNfse></Nfse></CompNfse></ListaNfse></ConsultarNfseResposta>`
+			srv := fakeABRASF(t, soapEnvelope(body))
+			defer srv.Close()
+
+			workspace := workspaceWith(t, srv)
+			out, err := runCmd(t, "--json", "-w", workspace, "query", "-n", "42")
+			require.NoError(t, err)
+			var got map[string]any
+			require.NoError(t, json.Unmarshal([]byte(out), &got))
+			q := got["query"].(map[string]any)
+			nfses := q["nfses"].([]any)
+			require.Len(t, nfses, 1)
+			nfse := nfses[0].(map[string]any)
+			assert.Equal(t, "42", nfse["numero"])
+			assert.Equal(t, strings.ReplaceAll(tc.url, "&amp;", "&"), nfse["url"])
+		})
+	}
 }
 
 func TestQueryRequiresFilter(t *testing.T) {

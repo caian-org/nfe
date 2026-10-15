@@ -2,15 +2,22 @@
 
 ## Project Structure & Module Organization
 
-`nf` is a Go CLI for emitting, querying, and cancelling Brazilian NFS-e
-documents that follow the ABRASF v2.04 standard. The repository is a single
-Go module (`github.com/caian-org/nfe`); the binary entrypoint is
-`cmd/nfe/main.go` and all domain logic lives under `internal/`.
+`nf` is a Go CLI for emitting and querying Brazilian NFS-e documents. For
+Franco da Rocha it builds the national-layout DPS and posts it to the
+SIGCORP "WS Padrão Nacional" REST API; for other municipalities it speaks
+ABRASF v2.04 over SOAP. The repository is a single Go module
+(`github.com/caian-org/nfe`); the binary entrypoint is `cmd/nfe/main.go` and
+all domain logic lives under `internal/`.
 
 - `internal/cli/` — Cobra commands (`init`, `env`, `status`, `emit`, `query`,
   `cancel`) and their tests. `root.go` declares the `Version`/`Commit`/
   `BuildDate` symbols injected by goreleaser ldflags.
 - `internal/config/` — TOML configuration loader, defaults, and validation.
+  `[nacional]` switches the national path; `[ibscbs]` enables the IBS/CBS
+  group.
+- `internal/dps/` — national DPS XML (XSD v1.01) builder, marshaller and
+  NFS-e parser, with goldens `testdata/golden/dps_*.xml`.
+- `internal/sigcorp/` — REST client for the SIGCORP recepção/consulta API.
 - `internal/abrasf/` — ABRASF v2.04 builders (`GerarNfse`,
   `ConsultarNfseServicoPrestado`, `CancelarNfse`), fixed-decimal types
   (`Dec1`/`Dec2`), response parsing, and the golden XML test suite.
@@ -19,7 +26,8 @@ Go module (`github.com/caian-org/nfe`); the binary entrypoint is
 - `internal/soap/` — SOAP 1.1 client, WSDL auto-discovery, and the mTLS +
   optional basic-auth transport plumbing.
 - `internal/service/` — High-level orchestration (build → sign → send →
-  parse) consumed by the CLI layer.
+  parse) consumed by the CLI layer; `emit_nacional.go` holds the REST flow
+  and protocol polling.
 - `internal/nota/` — TOML input schema for the emission flow.
 - `internal/render/` — Human and JSON renderers for CLI output.
 - `internal/validation/`, `internal/logging/` — small helpers.
@@ -40,15 +48,16 @@ Standard Go toolchain. Common targets:
 - `just lint` — currently `go vet ./...`. CI additionally runs
   `golangci-lint` per `.golangci.yml`.
 - `just tidy` — `go mod tidy`.
-- `go test ./internal/abrasf/... -update` — regenerate the XML golden
-  fixtures under `testdata/golden/`.
+- `go test ./internal/abrasf/... -update` / `go test ./internal/dps/... -update`
+  — regenerate the XML golden fixtures under `testdata/golden/`.
 
 ## Coding Style & Naming Conventions
 
 - Idiomatic Go ≥ 1.26 with `gofmt` and `goimports`, enforced via
   golangci-lint.
-- The struct field order in `internal/abrasf/types.go` is authoritative
-  for XML element order. Never reorder without regenerating goldens.
+- The struct field order in `internal/abrasf/types.go` and
+  `internal/dps/types.go` is authoritative for XML element order. Never
+  reorder without regenerating goldens.
 - Decimal formatting goes through `Dec1`/`Dec2` (`internal/abrasf/decimal.go`)
   so the wire format matches the JS original byte-for-byte.
 - Errors wrap with a package prefix in English followed by a Portuguese
@@ -84,8 +93,10 @@ goreleaser (`.goreleaser.yaml`) to publish multi-platform archives.
 Three rules every agent must honour in this repo:
 
 1. **Never run write-side operations** (`emit`, `cancel`) against the
-   user's real `ws/` configuration. Live smoke tests stay read-only:
-   `status`, `query`. The user has explicitly enforced this.
+   user's real `ws/` (or `~/.nfews`) configuration. Live smoke tests stay
+   read-only: `status`, `query`. Tests against the SIGCORP QA host need
+   the user's explicit go-ahead and a separate workspace. The user has
+   explicitly enforced this.
 2. **Do not edit anything under `ws/`.** That directory is gitignored
    and contains the user's certificate and live config. Treat it as
    read-only personal data.

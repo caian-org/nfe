@@ -7,6 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +28,8 @@ type Config struct {
 	Prestador     Prestador     `toml:"prestador"`
 	Autenticacao  Autenticacao  `toml:"autenticacao"`
 	Configuracoes Configuracoes `toml:"configuracoes"`
+	Nacional      *Nacional     `toml:"nacional,omitempty"`
+	IBSCBS        *IBSCBS       `toml:"ibscbs,omitempty"`
 
 	// configDir is the absolute directory of the loaded config file.
 	// Used by CertificatePath to resolve relative cert paths. Unexported so
@@ -33,11 +38,16 @@ type Config struct {
 	configDir string
 }
 
-// SOAP holds the WSDL endpoints used for each environment. Making them
+// SOAP holds the transport endpoints used for each environment. Making them
 // configurable lets the same binary serve any ABRASF municipality.
 type SOAP struct {
-	WSDLHomologacao string `toml:"wsdl_homologacao"`
-	WSDLProducao    string `toml:"wsdl_producao"`
+	WSDLHomologacao      string `toml:"wsdl_homologacao,omitempty"`
+	WSDLProducao         string `toml:"wsdl_producao,omitempty"`
+	EndpointHomologacao  string `toml:"endpoint_homologacao,omitempty"`
+	EndpointProducao     string `toml:"endpoint_producao,omitempty"`
+	NamespaceHomologacao string `toml:"namespace_homologacao,omitempty"`
+	NamespaceProducao    string `toml:"namespace_producao,omitempty"`
+	SOAPActionPrefix     string `toml:"soap_action_prefix,omitempty"`
 }
 
 type Prestador struct {
@@ -82,12 +92,111 @@ type Configuracoes struct {
 	AliquotaISS      float64 `toml:"aliquota_iss"`
 	ConfirmTimeout   string  `toml:"confirm_timeout,omitempty"`
 	ConfirmInterval  string  `toml:"confirm_interval,omitempty"`
+	// ProximoNumeroNFSe feeds the X-NFSe-nNFSe header of the SIGCORP national
+	// webservice; the prestador numbers its own NFS-e there.
+	ProximoNumeroNFSe int `toml:"proximo_numero_nfse,omitempty"`
+}
+
+// Nacional enables the SIGCORP "WS Padrão Nacional" transport: a REST API
+// that receives the national DPS XML instead of the ABRASF SOAP envelope.
+// When the section is absent the CLI keeps using [soap].
+type Nacional struct {
+	URLProducao     string `toml:"url_producao"`
+	URLHomologacao  string `toml:"url_homologacao"`
+	SerieDPS        string `toml:"serie_dps"`
+	VersaoAplicacao string `toml:"versao_aplicacao,omitempty"`
+	OpSimpNac       int    `toml:"op_simp_nac"`
+	RegEspTrib      int    `toml:"reg_esp_trib"`
+	AssinarDPS      *bool  `toml:"assinar_dps,omitempty"`
+}
+
+// IBSCBS holds the per-prestador defaults of the DPS IBSCBS group. Rates are
+// percentages (0.1 means 0.1%). The group is only emitted when this section
+// exists.
+type IBSCBS struct {
+	CST                           string   `toml:"cst"`
+	CodigoClassificacaoTributaria string   `toml:"codigo_classificacao_tributaria"`
+	CodigoIndicadorOperacao       string   `toml:"codigo_indicador_operacao"`
+	AliquotaIBSUF                 *float64 `toml:"aliquota_ibs_uf"`
+	AliquotaIBSMunicipal          *float64 `toml:"aliquota_ibs_municipal"`
+	AliquotaCBS                   *float64 `toml:"aliquota_cbs"`
 }
 
 const (
-	DefaultConfirmTimeout  = "2m"
-	DefaultConfirmInterval = "5s"
+	DefaultConfirmTimeout   = "2m"
+	DefaultConfirmInterval  = "5s"
+	DefaultSOAPActionPrefix = "nfs#"
+
+	DefaultNacionalURLProducao    = "https://webservice.meumunicipio.online"
+	DefaultNacionalURLHomologacao = "https://qa-webservice.meumunicipio.online"
+	DefaultSerieDPS               = "1"
+	DefaultVersaoAplicacao        = "nfe"
+
+	OpSimpNacNaoOptante = 1
+	OpSimpNacMEI        = 2
+	OpSimpNacMEEPP      = 3
 )
+
+var (
+	serieDPSRegex  = regexp.MustCompile(`^0{0,4}\d{1,5}$`)
+	digits3Regex   = regexp.MustCompile(`^\d{3}$`)
+	digits6Regex   = regexp.MustCompile(`^\d{6}$`)
+	nNFSeMaxDigits = 13
+	versaoAplicMax = 20
+)
+
+// IsNacional reports whether the SIGCORP national REST transport is active.
+func (c *Config) IsNacional() bool {
+	return c.Nacional != nil
+}
+
+// NacionalURL returns the REST base URL for the configured ambiente.
+func (c *Config) NacionalURL() string {
+	if c.Nacional == nil {
+		return ""
+	}
+	if c.Ambiente == EnvProducao {
+		return strings.TrimRight(c.Nacional.URLProducao, "/")
+	}
+	return strings.TrimRight(c.Nacional.URLHomologacao, "/")
+}
+
+// TpAmb maps ambiente to the DPS tpAmb code: 1 produção, 2 homologação.
+func (c *Config) TpAmb() int {
+	if c.Ambiente == EnvProducao {
+		return 1
+	}
+	return 2
+}
+
+// NacionalUsuario returns the Basic Auth user for the national webservice:
+// autenticacao.usuario when set, otherwise the prestador's inscrição municipal.
+func (c *Config) NacionalUsuario() string {
+	if c.Autenticacao.Usuario != "" {
+		return c.Autenticacao.Usuario
+	}
+	return c.Prestador.InscricaoMunicipal
+}
+
+// AssinarDPS reports whether the DPS must be signed before posting. Defaults
+// to true; it only takes effect when a certificate is configured.
+func (c *Config) AssinarDPS() bool {
+	if c.Nacional == nil {
+		return false
+	}
+	if c.Nacional.AssinarDPS == nil {
+		return true
+	}
+	return *c.Nacional.AssinarDPS
+}
+
+// VersaoAplicacao returns the verAplic value sent in the DPS.
+func (c *Config) VersaoAplicacao() string {
+	if c.Nacional == nil || c.Nacional.VersaoAplicacao == "" {
+		return DefaultVersaoAplicacao
+	}
+	return c.Nacional.VersaoAplicacao
+}
 
 // WSDLURL returns the WSDL endpoint for the configured ambiente.
 func (c *Config) WSDLURL() string {
@@ -95,6 +204,39 @@ func (c *Config) WSDLURL() string {
 		return c.SOAP.WSDLProducao
 	}
 	return c.SOAP.WSDLHomologacao
+}
+
+// EndpointURL returns the explicit SOAP endpoint for the configured ambiente,
+// or an empty string when the client should discover it from the WSDL.
+func (c *Config) EndpointURL() string {
+	if c.Ambiente == EnvProducao {
+		return c.SOAP.EndpointProducao
+	}
+	return c.SOAP.EndpointHomologacao
+}
+
+// MethodNamespace returns the explicit method namespace for the configured
+// ambiente, or the endpoint URL as the ABRASF direct-endpoint fallback.
+func (c *Config) MethodNamespace() string {
+	if c.Ambiente == EnvProducao {
+		if c.SOAP.NamespaceProducao != "" {
+			return c.SOAP.NamespaceProducao
+		}
+		return c.SOAP.EndpointProducao
+	}
+	if c.SOAP.NamespaceHomologacao != "" {
+		return c.SOAP.NamespaceHomologacao
+	}
+	return c.SOAP.EndpointHomologacao
+}
+
+// SOAPActionPrefix returns the configured SOAPAction prefix. ABRASF WSDLs
+// usually declare values such as "nfs#GerarNfse".
+func (c *Config) SOAPActionPrefix() string {
+	if c.SOAP.SOAPActionPrefix == "" {
+		return DefaultSOAPActionPrefix
+	}
+	return c.SOAP.SOAPActionPrefix
 }
 
 // IsProducao reports whether the configuration targets the production
@@ -136,11 +278,31 @@ func Load(path string) (*Config, error) {
 }
 
 func applyDefaults(cfg *Config) {
+	if cfg.SOAP.SOAPActionPrefix == "" {
+		cfg.SOAP.SOAPActionPrefix = DefaultSOAPActionPrefix
+	}
 	if cfg.Configuracoes.ConfirmTimeout == "" {
 		cfg.Configuracoes.ConfirmTimeout = DefaultConfirmTimeout
 	}
 	if cfg.Configuracoes.ConfirmInterval == "" {
 		cfg.Configuracoes.ConfirmInterval = DefaultConfirmInterval
+	}
+	if n := cfg.Nacional; n != nil {
+		if n.URLProducao == "" {
+			n.URLProducao = DefaultNacionalURLProducao
+		}
+		if n.URLHomologacao == "" {
+			n.URLHomologacao = DefaultNacionalURLHomologacao
+		}
+		if n.SerieDPS == "" {
+			n.SerieDPS = DefaultSerieDPS
+		}
+		if n.OpSimpNac == 0 {
+			n.OpSimpNac = OpSimpNacNaoOptante
+		}
+		if cfg.Configuracoes.ProximoNumeroNFSe == 0 {
+			cfg.Configuracoes.ProximoNumeroNFSe = 1
+		}
 	}
 }
 
@@ -231,7 +393,8 @@ func Validate(cfg *Config) []string {
 		errs = append(errs, "inscrição municipal do prestador é obrigatória")
 	}
 
-	hasUserAuth := cfg.Autenticacao.Usuario != "" && cfg.Autenticacao.Senha != ""
+	hasUserAuth := cfg.Autenticacao.Senha != "" &&
+		(cfg.Autenticacao.Usuario != "" || (cfg.Nacional != nil && cfg.Prestador.InscricaoMunicipal != ""))
 	hasCertAuth := cfg.Autenticacao.Certificado != nil &&
 		cfg.Autenticacao.Certificado.Path != "" &&
 		cfg.Autenticacao.Certificado.Senha != ""
@@ -258,16 +421,80 @@ func Validate(cfg *Config) []string {
 	if cfg.Configuracoes.CodigoMunicipio == "" {
 		errs = append(errs, "código do município é obrigatório")
 	}
-	if cfg.SOAP.WSDLHomologacao == "" {
-		errs = append(errs, "soap.wsdl_homologacao é obrigatório")
+	if cfg.Nacional == nil {
+		if cfg.SOAP.WSDLHomologacao == "" && cfg.SOAP.EndpointHomologacao == "" {
+			errs = append(errs, "soap.wsdl_homologacao ou soap.endpoint_homologacao é obrigatório")
+		}
+		if cfg.SOAP.WSDLProducao == "" && cfg.SOAP.EndpointProducao == "" {
+			errs = append(errs, "soap.wsdl_producao ou soap.endpoint_producao é obrigatório")
+		}
+	} else {
+		errs = append(errs, validateNacional(cfg)...)
 	}
-	if cfg.SOAP.WSDLProducao == "" {
-		errs = append(errs, "soap.wsdl_producao é obrigatório")
+	if cfg.IBSCBS != nil {
+		errs = append(errs, validateIBSCBS(cfg.IBSCBS)...)
 	}
 	if _, _, err := cfg.Configuracoes.ConfirmDurations(); err != nil {
 		errs = append(errs, err.Error())
 	}
 
+	return errs
+}
+
+func validateNacional(cfg *Config) []string {
+	var errs []string
+	n := cfg.Nacional
+	if n.URLProducao == "" {
+		errs = append(errs, "nacional.url_producao é obrigatório")
+	}
+	if n.URLHomologacao == "" {
+		errs = append(errs, "nacional.url_homologacao é obrigatório")
+	}
+	if !serieDPSRegex.MatchString(n.SerieDPS) {
+		errs = append(errs, "nacional.serie_dps deve ser numérica com até 5 dígitos (ex.: \"1\")")
+	}
+	if len(n.VersaoAplicacao) > versaoAplicMax {
+		errs = append(errs, "nacional.versao_aplicacao deve ter até 20 caracteres")
+	}
+	if n.OpSimpNac < OpSimpNacNaoOptante || n.OpSimpNac > OpSimpNacMEEPP {
+		errs = append(errs, "nacional.op_simp_nac deve ser 1 (não optante), 2 (MEI) ou 3 (ME/EPP)")
+	}
+	if n.RegEspTrib < 0 || n.RegEspTrib > 9 || (n.RegEspTrib > 6 && n.RegEspTrib < 9) {
+		errs = append(errs, "nacional.reg_esp_trib deve ser 0-6 ou 9")
+	}
+	if cfg.NacionalUsuario() == "" || cfg.Autenticacao.Senha == "" {
+		errs = append(errs, "modo nacional exige autenticacao.senha (senha do portal) e usuário (autenticacao.usuario ou prestador.inscricao_municipal)")
+	}
+	if cfg.Configuracoes.ProximoNumeroNFSe < 1 || len(strconv.Itoa(cfg.Configuracoes.ProximoNumeroNFSe)) > nNFSeMaxDigits {
+		errs = append(errs, "configuracoes.proximo_numero_nfse deve ser um inteiro entre 1 e 13 dígitos")
+	}
+	return errs
+}
+
+func validateIBSCBS(i *IBSCBS) []string {
+	var errs []string
+	if !digits3Regex.MatchString(i.CST) {
+		errs = append(errs, "ibscbs.cst deve conter exatamente 3 dígitos numéricos")
+	}
+	if !digits6Regex.MatchString(i.CodigoClassificacaoTributaria) {
+		errs = append(errs, "ibscbs.codigo_classificacao_tributaria deve conter exatamente 6 dígitos numéricos")
+	}
+	if !digits6Regex.MatchString(i.CodigoIndicadorOperacao) {
+		errs = append(errs, "ibscbs.codigo_indicador_operacao deve conter exatamente 6 dígitos numéricos")
+	}
+	for name, v := range map[string]*float64{
+		"ibscbs.aliquota_ibs_uf":        i.AliquotaIBSUF,
+		"ibscbs.aliquota_ibs_municipal": i.AliquotaIBSMunicipal,
+		"ibscbs.aliquota_cbs":           i.AliquotaCBS,
+	} {
+		switch {
+		case v == nil:
+			errs = append(errs, name+" é obrigatória quando [ibscbs] está configurado")
+		case *v < 0 || *v >= 100:
+			errs = append(errs, name+" deve estar entre 0 e 100")
+		}
+	}
+	sort.Strings(errs)
 	return errs
 }
 

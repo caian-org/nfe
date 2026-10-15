@@ -7,8 +7,12 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"io"
 	"math/big"
 	mathrand "math/rand"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -20,6 +24,7 @@ import (
 	"github.com/caian-org/nfe/internal/config"
 	"github.com/caian-org/nfe/internal/nota"
 	"github.com/caian-org/nfe/internal/service"
+	"github.com/caian-org/nfe/internal/sigcorp"
 	"github.com/caian-org/nfe/internal/xmlsig"
 )
 
@@ -56,6 +61,7 @@ func makeCert(t *testing.T) (*x509.Certificate, *rsa.PrivateKey) {
 func fixtureService(t *testing.T, withSigner bool) (*service.Service, *fakeSOAP) {
 	t.Helper()
 	cfg := config.Default()
+	cfg.Nacional = nil // ABRASF/SOAP fixtures
 	cfg.Prestador.CNPJ = "11222333000181"
 	cfg.Prestador.InscricaoMunicipal = "123456"
 
@@ -222,6 +228,42 @@ func TestQueryByRPS(t *testing.T) {
 	assert.Contains(t, string(fake.lastBody), "<Numero>7</Numero>")
 }
 
+func TestQueryUsesDirectEndpointWithoutFetchingWSDL(t *testing.T) {
+	var gotAction string
+	var gotBody string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			t.Fatalf("WSDL must not be fetched when endpoint is configured")
+		}
+		gotAction = r.Header.Get("SOAPAction")
+		body, _ := io.ReadAll(r.Body)
+		gotBody = string(body)
+		w.Header().Set("Content-Type", "text/xml; charset=utf-8")
+		w.Write(wrapSOAPResponse(`<ConsultarNfseResposta><ListaNfse><CompNfse><Nfse><InfNfse><Numero>1</Numero></InfNfse></Nfse></CompNfse></ListaNfse></ConsultarNfseResposta>`))
+	}))
+	defer srv.Close()
+
+	cfg := config.Default()
+	cfg.Nacional = nil
+	cfg.Autenticacao.Usuario = "u"
+	cfg.Autenticacao.Senha = "p"
+	cfg.SOAP.WSDLHomologacao = "http://127.0.0.1:1/unavailable?wsdl"
+	cfg.SOAP.EndpointHomologacao = srv.URL
+	cfg.SOAP.NamespaceHomologacao = "urn:test"
+	cfg.SOAP.SOAPActionPrefix = "custom#"
+
+	svc, err := service.New(service.Options{Config: cfg})
+	require.NoError(t, err)
+
+	res, err := svc.Query(context.Background(), abrasf.ConsultaQuery{Numero: "42"})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	assert.Equal(t, `"custom#ConsultarNfseServicoPrestado"`, gotAction)
+	assert.Contains(t, gotBody, `xmlns:tns="urn:test"`)
+	assert.Contains(t, gotBody, "<tns:ConsultarNfseServicoPrestadoRequest>")
+	assert.NotContains(t, strings.ToLower(gotBody), "wsdl")
+}
+
 func TestQuerySurfacesErrors(t *testing.T) {
 	svc, fake := fixtureService(t, false)
 	fake.response = wrapSOAPResponse(`<r><MensagemRetorno><Codigo>E1</Codigo><Mensagem>m</Mensagem></MensagemRetorno></r>`)
@@ -230,6 +272,22 @@ func TestQuerySurfacesErrors(t *testing.T) {
 	var me *service.MessagesError
 	require.ErrorAs(t, err, &me)
 	assert.Equal(t, "query", me.Action)
+}
+
+func TestQueryHTTPErrorSurfacesSOAPFault(t *testing.T) {
+	svc, fake := fixtureService(t, false)
+	fake.err = errors.New("soap: servidor retornou HTTP 500")
+	fake.response = []byte(`<?xml version="1.0"?><soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/"><soap:Body><soap:Fault><faultstring>Falha interna do provedor</faultstring></soap:Fault></soap:Body></soap:Envelope>`)
+
+	res, err := svc.Query(context.Background(), abrasf.ConsultaQuery{Numero: "1"})
+	require.Error(t, err)
+	require.NotNil(t, res)
+	var me *service.MessagesError
+	require.ErrorAs(t, err, &me)
+	assert.Equal(t, "query", me.Action)
+	require.Len(t, res.Mensagens, 1)
+	assert.Equal(t, "SOAP", res.Mensagens[0].Codigo)
+	assert.Equal(t, "Falha interna do provedor", res.Mensagens[0].Mensagem)
 }
 
 func TestQueryRequiresFilter(t *testing.T) {
@@ -266,4 +324,207 @@ func TestCancelValidatesCodigo(t *testing.T) {
 func TestServiceNewRequiresConfig(t *testing.T) {
 	_, err := service.New(service.Options{})
 	require.Error(t, err)
+}
+
+type fakeREST struct {
+	recepcao     *sigcorp.Recepcao
+	recepcaoErr  error
+	recepcaoRaw  []byte
+	consultas    []*sigcorp.Consulta
+	consultaErr  error
+	failFirst    int // number of initial Consultar calls that return consultaErr
+	lastNNFSe    string
+	lastDPS      []byte
+	consultaHits int
+}
+
+func (f *fakeREST) Recepcionar(ctx context.Context, nNFSe string, dps []byte) (*sigcorp.Recepcao, []byte, error) {
+	f.lastNNFSe = nNFSe
+	f.lastDPS = dps
+	return f.recepcao, f.recepcaoRaw, f.recepcaoErr
+}
+
+func (f *fakeREST) Consultar(ctx context.Context, protocolo string) (*sigcorp.Consulta, []byte, error) {
+	if f.consultaErr != nil && (f.failFirst == 0 || f.consultaHits < f.failFirst) {
+		f.consultaHits++
+		return nil, nil, f.consultaErr
+	}
+	idx := f.consultaHits - f.failFirst
+	if idx < 0 {
+		idx = 0
+	}
+	if idx >= len(f.consultas) {
+		idx = len(f.consultas) - 1
+	}
+	f.consultaHits++
+	c := f.consultas[idx]
+	return c, c.Raw, nil
+}
+
+func nacionalInput() *nota.Input {
+	in := fixtureInput()
+	in.CNBS = "115022000"
+	in.Servico.CodigoTributacaoNacional = "010101"
+	return in
+}
+
+func fixtureNacional(t *testing.T, withSigner bool) (*service.Service, *fakeREST) {
+	t.Helper()
+	cfg := config.Default()
+	cfg.Prestador.CNPJ = "11222333000181"
+	cfg.Prestador.InscricaoMunicipal = "123456"
+	cfg.Configuracoes.CodigoMunicipio = "3516309"
+	cfg.Configuracoes.ProximoNumeroRPS = 7
+	cfg.Configuracoes.ProximoNumeroNFSe = 3
+	rest := &fakeREST{}
+	opts := service.Options{
+		Config: cfg,
+		REST:   rest,
+		Now:    func() time.Time { return time.Date(2026, 10, 15, 9, 0, 0, 0, time.FixedZone("BRT", -3*3600)) },
+	}
+	if withSigner {
+		cert, key := makeCert(t)
+		signer, err := xmlsig.NewSigner(cert, key)
+		require.NoError(t, err)
+		opts.Signer = signer
+	}
+	svc, err := service.New(opts)
+	require.NoError(t, err)
+	return svc, rest
+}
+
+func TestNacionalEmitAcceptedBumpsBothCounters(t *testing.T) {
+	svc, rest := fixtureNacional(t, true)
+	rest.recepcao = &sigcorp.Recepcao{Protocolo: "p-1"}
+	rest.recepcaoRaw = []byte(`{"protocolo":"p-1"}`)
+
+	res, err := svc.Emit(context.Background(), nacionalInput())
+	require.NoError(t, err)
+	assert.Equal(t, "p-1", res.Protocolo)
+	assert.Equal(t, 7, res.NumeroRPS)
+	assert.Equal(t, "3", res.NumeroNFSe)
+	assert.Equal(t, "3", rest.lastNNFSe)
+	assert.Equal(t, 8, svc.Config().Configuracoes.ProximoNumeroRPS)
+	assert.Equal(t, 4, svc.Config().Configuracoes.ProximoNumeroNFSe)
+
+	doc := etree.NewDocument()
+	require.NoError(t, doc.ReadFromBytes(rest.lastDPS))
+	root := doc.Root()
+	assert.Equal(t, "DPS", root.Tag)
+	require.Len(t, root.ChildElements(), 2, "infDPS + Signature")
+	assert.Equal(t, "Signature", root.ChildElements()[1].Tag)
+	assert.Equal(t, "#"+root.ChildElements()[0].SelectAttrValue("Id", ""), root.FindElement(".//Reference").SelectAttrValue("URI", ""))
+}
+
+func TestNacionalEmitSkipsSignatureWhenDisabled(t *testing.T) {
+	svc, rest := fixtureNacional(t, true)
+	off := false
+	svc.Config().Nacional.AssinarDPS = &off
+	rest.recepcao = &sigcorp.Recepcao{Protocolo: "p"}
+	_, err := svc.Emit(context.Background(), nacionalInput())
+	require.NoError(t, err)
+	assert.NotContains(t, string(rest.lastDPS), "<Signature")
+}
+
+func TestNacionalEmitHTTPErrorIsMessagesErrorAndKeepsCounters(t *testing.T) {
+	svc, rest := fixtureNacional(t, false)
+	rest.recepcaoErr = &sigcorp.HTTPError{URL: "u", Status: 403, Body: []byte(`{"message":"IM divergente"}`)}
+	rest.recepcaoRaw = []byte(`{"message":"IM divergente"}`)
+
+	res, err := svc.Emit(context.Background(), nacionalInput())
+	require.Error(t, err)
+	var me *service.MessagesError
+	require.ErrorAs(t, err, &me)
+	require.NotNil(t, res)
+	assert.Contains(t, res.Mensagens[0].Mensagem, "HTTP 403")
+	assert.Equal(t, 7, svc.Config().Configuracoes.ProximoNumeroRPS)
+	assert.Equal(t, 3, svc.Config().Configuracoes.ProximoNumeroNFSe)
+}
+
+func TestNacionalEmitUnavailableIsPlainError(t *testing.T) {
+	svc, rest := fixtureNacional(t, false)
+	rest.recepcaoErr = &sigcorp.UnavailableError{URL: "https://x", Status: 502}
+	_, err := svc.Emit(context.Background(), nacionalInput())
+	require.Error(t, err)
+	var me *service.MessagesError
+	assert.False(t, errors.As(err, &me))
+	assert.Contains(t, err.Error(), "indisponível")
+}
+
+func TestNacionalWaitConfirmacaoApproved(t *testing.T) {
+	svc, rest := fixtureNacional(t, false)
+	rest.consultas = []*sigcorp.Consulta{
+		{Status: sigcorp.StatusEmProcessamento, Raw: []byte(`{"status":"em_processamento"}`)},
+		{Status: sigcorp.StatusAprovado, NFSeXML: `<NFSe><infNFSe Id="NFS123"><nNFSe>3</nNFSe></infNFSe></NFSe>`, LinkImpressao: "https://l", Raw: []byte(`{"status":"aprovado"}`)},
+	}
+	res, err := svc.WaitConfirmacao(context.Background(), "p", time.Second, time.Millisecond)
+	require.NoError(t, err)
+	assert.True(t, res.Final)
+	assert.Equal(t, sigcorp.StatusAprovado, res.Status)
+	require.NotNil(t, res.NFSe)
+	assert.Equal(t, "3", res.NFSe.Numero)
+	assert.Equal(t, "123", res.NFSe.ChaveAcesso)
+	assert.Equal(t, "https://l", res.LinkImpressao)
+	assert.Equal(t, 2, rest.consultaHits)
+}
+
+func TestNacionalWaitConfirmacaoRejected(t *testing.T) {
+	svc, rest := fixtureNacional(t, false)
+	rest.consultas = []*sigcorp.Consulta{{Status: sigcorp.StatusRejeitado, Motivos: []string{"cNBS ausente"}, Raw: []byte(`{}`)}}
+	res, err := svc.WaitConfirmacao(context.Background(), "p", time.Second, time.Millisecond)
+	require.Error(t, err)
+	var me *service.MessagesError
+	require.ErrorAs(t, err, &me)
+	require.NotNil(t, res)
+	assert.True(t, res.Final)
+	assert.Equal(t, "cNBS ausente", res.Mensagens[0].Mensagem)
+}
+
+func TestNacionalWaitConfirmacaoTimeoutIsPending(t *testing.T) {
+	svc, rest := fixtureNacional(t, false)
+	rest.consultas = []*sigcorp.Consulta{{Status: sigcorp.StatusEmProcessamento, Raw: []byte(`{}`)}}
+	res, err := svc.WaitConfirmacao(context.Background(), "p", 30*time.Millisecond, 5*time.Millisecond)
+	require.NoError(t, err)
+	assert.False(t, res.Final)
+	assert.Equal(t, sigcorp.StatusEmProcessamento, res.Status)
+}
+
+func TestNacionalWaitConfirmacaoToleratesTransientUnavailability(t *testing.T) {
+	svc, rest := fixtureNacional(t, false)
+	rest.consultaErr = &sigcorp.UnavailableError{URL: "u", Status: 503}
+	rest.failFirst = 2
+	rest.consultas = []*sigcorp.Consulta{{Status: sigcorp.StatusAprovado, Raw: []byte(`{}`)}}
+	res, err := svc.WaitConfirmacao(context.Background(), "p", time.Second, time.Millisecond)
+	require.NoError(t, err)
+	assert.True(t, res.Final)
+	assert.Equal(t, 3, rest.consultaHits)
+}
+
+func TestNacionalWaitConfirmacaoStopsOnHardError(t *testing.T) {
+	svc, rest := fixtureNacional(t, false)
+	rest.consultaErr = &sigcorp.HTTPError{URL: "u", Status: 401}
+	_, err := svc.WaitConfirmacao(context.Background(), "p", time.Second, time.Millisecond)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "HTTP 401")
+	assert.Equal(t, 1, rest.consultaHits)
+}
+
+func TestNacionalQueryAndCancelGuards(t *testing.T) {
+	svc, _ := fixtureNacional(t, false)
+	_, err := svc.Query(context.Background(), abrasf.ConsultaQuery{Numero: "1"})
+	require.ErrorIs(t, err, service.ErrNaoSuportadoNacional)
+	_, err = svc.QueryByRPS(context.Background(), abrasf.IdentificacaoRps{Numero: 1})
+	require.ErrorIs(t, err, service.ErrNaoSuportadoNacional)
+	_, err = svc.Cancel(context.Background(), "1", 1)
+	require.ErrorIs(t, err, service.ErrNaoSuportadoNacional)
+}
+
+func TestNacionalDryRunDoesNotTouchNetworkOrCounters(t *testing.T) {
+	svc, rest := fixtureNacional(t, false)
+	res, err := svc.EmitDryRun(nacionalInput())
+	require.NoError(t, err)
+	assert.Equal(t, "3", res.NumeroNFSe)
+	assert.Contains(t, string(res.SignedXML), "<DPS ")
+	assert.Nil(t, rest.lastDPS)
+	assert.Equal(t, 3, svc.Config().Configuracoes.ProximoNumeroNFSe)
 }
