@@ -278,17 +278,71 @@ func TestValidate(t *testing.T) {
 			want: "código do município é obrigatório",
 		},
 		{
-			name: "missing wsdl homologacao",
-			fix:  func(c *config.Config) { c.SOAP.WSDLHomologacao = "" },
+			name: "missing wsdl homologacao in soap mode",
+			fix: func(c *config.Config) {
+				c.Nacional = nil
+				c.SOAP.WSDLHomologacao = ""
+			},
 			want: "soap.wsdl_homologacao",
 		},
 		{
 			name: "wsdl homologacao can be replaced by endpoint",
 			fix: func(c *config.Config) {
+				c.Nacional = nil
 				c.SOAP.WSDLHomologacao = ""
 				c.SOAP.EndpointHomologacao = "https://soap.example.test/ws/nfs"
 			},
 			want: "",
+		},
+		{
+			name: "nacional mode does not need soap",
+			fix: func(c *config.Config) {
+				c.SOAP = config.SOAP{}
+			},
+			want: "",
+		},
+		{
+			name: "nacional serie must be numeric",
+			fix:  func(c *config.Config) { c.Nacional.SerieDPS = "E" },
+			want: "nacional.serie_dps",
+		},
+		{
+			name: "nacional needs senha",
+			fix: func(c *config.Config) {
+				c.Autenticacao.Senha = ""
+				c.Autenticacao.Certificado = &config.Certificado{Path: "c.pfx", Senha: "x"}
+			},
+			want: "autenticacao.senha",
+		},
+		{
+			name: "nacional invalid op_simp_nac",
+			fix:  func(c *config.Config) { c.Nacional.OpSimpNac = 7 },
+			want: "nacional.op_simp_nac",
+		},
+		{
+			name: "nacional nNFSe counter must be positive",
+			fix:  func(c *config.Config) { c.Configuracoes.ProximoNumeroNFSe = 0 },
+			want: "proximo_numero_nfse",
+		},
+		{
+			name: "ibscbs missing rate",
+			fix:  func(c *config.Config) { c.IBSCBS.AliquotaCBS = nil },
+			want: "ibscbs.aliquota_cbs é obrigatória",
+		},
+		{
+			name: "ibscbs rate out of range",
+			fix:  func(c *config.Config) { v := 150.0; c.IBSCBS.AliquotaIBSUF = &v },
+			want: "ibscbs.aliquota_ibs_uf deve estar entre 0 e 100",
+		},
+		{
+			name: "ibscbs bad cst",
+			fix:  func(c *config.Config) { c.IBSCBS.CST = "0" },
+			want: "ibscbs.cst",
+		},
+		{
+			name: "ibscbs bad class trib",
+			fix:  func(c *config.Config) { c.IBSCBS.CodigoClassificacaoTributaria = "1" },
+			want: "ibscbs.codigo_classificacao_tributaria",
 		},
 		{
 			name: "invalid confirm timeout",
@@ -324,4 +378,88 @@ func TestValidate(t *testing.T) {
 func TestDefaultPassesValidation(t *testing.T) {
 	errs := config.Validate(config.Default())
 	require.Empty(t, errs, "default config must be valid: %v", errs)
+}
+
+func TestNacionalHelpers(t *testing.T) {
+	cfg := config.Default()
+	assert.True(t, cfg.IsNacional())
+	assert.Equal(t, config.DefaultNacionalURLHomologacao, cfg.NacionalURL())
+	assert.Equal(t, 2, cfg.TpAmb())
+	assert.True(t, cfg.AssinarDPS())
+	assert.Equal(t, "usuario", cfg.NacionalUsuario())
+
+	cfg.Ambiente = config.EnvProducao
+	cfg.Nacional.URLProducao = "https://prod.example.test/"
+	assert.Equal(t, "https://prod.example.test", cfg.NacionalURL())
+	assert.Equal(t, 1, cfg.TpAmb())
+
+	cfg.Autenticacao.Usuario = ""
+	assert.Equal(t, cfg.Prestador.InscricaoMunicipal, cfg.NacionalUsuario())
+
+	off := false
+	cfg.Nacional.AssinarDPS = &off
+	assert.False(t, cfg.AssinarDPS())
+
+	cfg.Nacional = nil
+	assert.False(t, cfg.IsNacional())
+	assert.Equal(t, "", cfg.NacionalURL())
+	assert.False(t, cfg.AssinarDPS())
+}
+
+func TestNacionalRoundTripAndDefaults(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.toml")
+	body := `ambiente = "homologacao"
+
+[nacional]
+serie_dps = "5"
+
+[prestador]
+cnpj = "11222333000181"
+inscricao_municipal = "123456"
+razao_social = "EXEMPLO LTDA"
+
+[prestador.endereco]
+endereco = "RUA"
+numero = "1"
+bairro = "B"
+codigo_municipio = "3516309"
+uf = "SP"
+cep = "01234000"
+
+[autenticacao]
+senha = "segredo"
+
+[configuracoes]
+serie_rps = "A"
+proximo_numero_rps = 1
+codigo_municipio = "3516309"
+aliquota_iss = 2.0
+
+[ibscbs]
+cst = "000"
+codigo_classificacao_tributaria = "000001"
+codigo_indicador_operacao = "100301"
+aliquota_ibs_uf = 0.1
+aliquota_ibs_municipal = 0.0
+aliquota_cbs = 0.9
+`
+	require.NoError(t, os.WriteFile(path, []byte(body), 0o644))
+	cfg, err := config.Load(path)
+	require.NoError(t, err)
+	require.NotNil(t, cfg.Nacional)
+	assert.Equal(t, config.DefaultNacionalURLProducao, cfg.Nacional.URLProducao)
+	assert.Equal(t, "5", cfg.Nacional.SerieDPS)
+	assert.Equal(t, config.OpSimpNacNaoOptante, cfg.Nacional.OpSimpNac)
+	assert.Equal(t, 1, cfg.Configuracoes.ProximoNumeroNFSe)
+	assert.Equal(t, "123456", cfg.NacionalUsuario())
+	require.NotNil(t, cfg.IBSCBS.AliquotaIBSMunicipal)
+	assert.Equal(t, 0.0, *cfg.IBSCBS.AliquotaIBSMunicipal)
+
+	require.NoError(t, config.Save(path, cfg))
+	again, err := config.Load(path)
+	require.NoError(t, err)
+	require.NotNil(t, again.IBSCBS.AliquotaIBSMunicipal)
+	assert.Equal(t, 0.0, *again.IBSCBS.AliquotaIBSMunicipal)
+	assert.Equal(t, cfg.Nacional.URLHomologacao, again.Nacional.URLHomologacao)
 }
